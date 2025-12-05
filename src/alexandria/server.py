@@ -10,7 +10,6 @@ import re
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
@@ -59,10 +58,10 @@ class DocumentSummary(BaseModel):
     """Summary for list_documents results."""
 
     id: int
-    title: str
-    latest_version: int  # Most recent version number
-    status: DocumentStatus  # Status of latest version
-    type: DocumentType
+    title: str = "NA"
+    latest_version: int
+    status: str = "NA"  # Allow "NA" for missing fields
+    type: str = "NA"  # Allow "NA" for missing fields
 
 
 class VersionInfo(BaseModel):
@@ -79,6 +78,13 @@ class DiffResult(BaseModel):
 
     unified_diff: str
     summary: str | None = None
+
+
+class ErrorResponse(BaseModel):
+    """Structured error for graceful failure responses."""
+
+    code: str  # "NOT_FOUND", "INVALID_FORMAT", "MISSING_FIELD"
+    message: str
 
 
 # =============================================================================
@@ -129,13 +135,30 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
     if len(parts) < 3:
         raise ValueError("Invalid frontmatter format")
 
-    frontmatter_yaml = parts[1].strip()
+    frontmatter_text = parts[1].strip()
     body = parts[2].strip()
 
-    try:
-        frontmatter = yaml.safe_load(frontmatter_yaml)
-    except yaml.YAMLError as e:
-        raise ValueError(f"Invalid YAML in frontmatter: {e}")
+    # Simple YAML parser for key: value pairs
+    frontmatter = {}
+    for line in frontmatter_text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" not in line:
+            continue
+        key, _, value = line.partition(":")
+        key = key.strip()
+        value = value.strip()
+        # Remove surrounding quotes if present
+        if (value.startswith('"') and value.endswith('"')) or (
+            value.startswith("'") and value.endswith("'")
+        ):
+            value = value[1:-1]
+        # Convert to int if numeric
+        if value.isdigit():
+            frontmatter[key] = int(value)
+        else:
+            frontmatter[key] = value
 
     return frontmatter, body
 
@@ -281,25 +304,32 @@ def scan_documents(
         latest_version, latest_path = max(versions, key=lambda x: x[0])
 
         try:
-            metadata, _ = parse_document(latest_path)
-        except (ValueError, KeyError):
-            continue  # Skip malformed documents
+            content = latest_path.read_text(encoding="utf-8")
+            frontmatter, _ = parse_frontmatter(content)
+        except (ValueError, OSError):
+            continue  # Skip files that can't be read or parsed
 
-        # Apply filters
-        if status and metadata.status != status:
+        # Extract fields with "NA" defaults for missing values
+        doc_title = frontmatter.get("title", "NA")
+        doc_status = frontmatter.get("status", "NA")
+        doc_type_val = frontmatter.get("type", "NA")
+        doc_author = frontmatter.get("author", "NA")
+
+        # Apply filters (skip filter if field is "NA")
+        if status and doc_status != "NA" and doc_status != status:
             continue
-        if doc_type and metadata.type != doc_type:
+        if doc_type and doc_type_val != "NA" and doc_type_val != doc_type:
             continue
-        if author and author.lower() not in metadata.author.lower():
+        if author and doc_author != "NA" and author.lower() not in doc_author.lower():
             continue
 
         summaries.append(
             DocumentSummary(
-                id=metadata.id,
-                title=metadata.title,
+                id=doc_id,
+                title=doc_title,
                 latest_version=latest_version,
-                status=metadata.status,
-                type=metadata.type,
+                status=doc_status,
+                type=doc_type_val,
             )
         )
 
@@ -330,10 +360,14 @@ def generate_diff(
     summary = None
     if include_summary:
         additions = sum(
-            1 for line in diff_lines if line.startswith("+") and not line.startswith("+++")
+            1
+            for line in diff_lines
+            if line.startswith("+") and not line.startswith("+++")
         )
         deletions = sum(
-            1 for line in diff_lines if line.startswith("-") and not line.startswith("---")
+            1
+            for line in diff_lines
+            if line.startswith("-") and not line.startswith("---")
         )
         summary = f"{additions} lines added, {deletions} lines removed"
 
@@ -345,7 +379,7 @@ def generate_diff(
 # =============================================================================
 
 server = FastMCP(
-    name="alexandria",
+    name="alexandria-mcp",
     instructions="Retrieve and compare versioned engineering documents. "
     "Documents have metadata (author, status, type) and chapters extracted from headings. "
     "Set ALEXANDRIA_DOCUMENTS_PATH environment variable to configure the documents folder.",
@@ -353,7 +387,7 @@ server = FastMCP(
 
 
 @server.tool
-def get_document(id: int, version: int | None = None) -> str:
+def get_document(id: int, version: int | None = None) -> dict:
     """Get document content by ID.
 
     Args:
@@ -361,14 +395,17 @@ def get_document(id: int, version: int | None = None) -> str:
         version: Specific version number, or None for latest version.
 
     Returns:
-        Full document content (including frontmatter).
+        Dict with 'content' key on success, or 'error' key on failure.
     """
-    path = find_document_path(id, version)
-    return path.read_text(encoding="utf-8")
+    try:
+        path = find_document_path(id, version)
+        return {"content": path.read_text(encoding="utf-8")}
+    except FileNotFoundError as e:
+        return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
 
 
 @server.tool
-def get_document_metadata(id: int, version: int | None = None) -> DocumentMetadata:
+def get_document_metadata(id: int, version: int | None = None) -> dict:
     """Get document metadata by ID.
 
     Args:
@@ -376,11 +413,18 @@ def get_document_metadata(id: int, version: int | None = None) -> DocumentMetada
         version: Specific version number, or None for latest version.
 
     Returns:
-        DocumentMetadata including title, author, status, type, and chapters.
+        Dict with 'metadata' key on success, or 'error' key on failure.
     """
-    path = find_document_path(id, version)
-    metadata, _ = parse_document(path)
-    return metadata
+    try:
+        path = find_document_path(id, version)
+        metadata, _ = parse_document(path)
+        return {"metadata": metadata.model_dump()}
+    except FileNotFoundError as e:
+        return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
+    except (ValueError, KeyError) as e:
+        return {
+            "error": ErrorResponse(code="INVALID_FORMAT", message=str(e)).model_dump()
+        }
 
 
 @server.tool
@@ -389,7 +433,7 @@ def compare_versions(
     old_version: int,
     new_version: int,
     format: str = "both",
-) -> DiffResult:
+) -> dict:
     """Compare two versions of a document.
 
     Args:
@@ -399,21 +443,24 @@ def compare_versions(
         format: Output format - "unified", "summary", or "both".
 
     Returns:
-        DiffResult with unified diff and/or summary based on format.
+        Dict with 'result' key on success, or 'error' key on failure.
     """
-    old_path = find_document_path(id, old_version)
-    new_path = find_document_path(id, new_version)
+    try:
+        old_path = find_document_path(id, old_version)
+        new_path = find_document_path(id, new_version)
 
-    old_content = old_path.read_text(encoding="utf-8")
-    new_content = new_path.read_text(encoding="utf-8")
+        old_content = old_path.read_text(encoding="utf-8")
+        new_content = new_path.read_text(encoding="utf-8")
 
-    include_summary = format in ("summary", "both")
-    result = generate_diff(old_content, new_content, include_summary)
+        include_summary = format in ("summary", "both")
+        result = generate_diff(old_content, new_content, include_summary)
 
-    if format == "summary":
-        result.unified_diff = ""  # Clear diff when only summary requested
+        if format == "summary":
+            result.unified_diff = ""  # Clear diff when only summary requested
 
-    return result
+        return {"result": result.model_dump()}
+    except FileNotFoundError as e:
+        return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
 
 
 @server.tool
@@ -436,17 +483,17 @@ def list_documents(
 
 
 @server.tool
-def list_versions(id: int) -> list[VersionInfo]:
+def list_versions(id: int) -> dict:
     """List all versions of a document.
 
     Args:
         id: The numeric document ID.
 
     Returns:
-        List of VersionInfo with version number, date, status, and author.
+        Dict with 'versions' key on success, or 'error' key on failure.
     """
     versions = []
-    for doc_id, version, path in get_all_document_files():
+    for doc_id, _, path in get_all_document_files():
         if doc_id != id:
             continue
 
@@ -464,9 +511,14 @@ def list_versions(id: int) -> list[VersionInfo]:
             continue  # Skip malformed documents
 
     if not versions:
-        raise FileNotFoundError(f"Document {id} not found")
+        return {
+            "error": ErrorResponse(
+                code="NOT_FOUND", message=f"Document {id} not found"
+            ).model_dump()
+        }
 
-    return sorted(versions, key=lambda v: v.version)
+    sorted_versions = sorted(versions, key=lambda v: v.version)
+    return {"versions": [v.model_dump() for v in sorted_versions]}
 
 
 # =============================================================================
@@ -476,7 +528,7 @@ def list_versions(id: int) -> list[VersionInfo]:
 
 def main():
     """Run the Alexandria MCP server."""
-    server.run()
+    server.run(show_banner=False)
 
 
 if __name__ == "__main__":
