@@ -44,6 +44,9 @@ htmlcov/
 *.manifest
 *.spec
 
+# Documentation build
+site/
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
@@ -59,3 +62,6 @@ coverage.xml
 .envrc
 
 # UV - keep uv.lock for reproducibility
+
+# Claude Code
+.claude/

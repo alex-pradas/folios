@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from alexandria.server import (
+from folios.server import (
     get_document,
     get_document_metadata,
     compare_versions,
@@ -21,7 +21,7 @@ class TestGetDocument:
 
         assert "content" in result
         assert "error" not in result
-        assert "Test Document" in result["content"]
+        assert "# Test Document" in result["content"]
         assert "---" in result["content"]  # Includes frontmatter
 
     def test_returns_latest_when_version_none(self, sample_docs: Path):
@@ -29,7 +29,7 @@ class TestGetDocument:
         result = get_document.fn(1001)
 
         assert "content" in result
-        assert "version: 2" in result["content"]  # v2 content
+        assert "status: \"Approved\"" in result["content"]  # v2 has Approved status
 
     def test_nonexistent_document_returns_error(self, sample_docs: Path):
         """Non-existent document ID returns graceful error response."""
@@ -70,13 +70,13 @@ class TestGetDocumentMetadata:
         assert metadata["status"] == "Draft"
 
     def test_includes_chapters(self, sample_docs: Path):
-        """Chapters list populated from document headings."""
+        """Chapters list populated from H2 headings."""
         result = get_document_metadata.fn(1001, 1)
 
         chapters = result["metadata"]["chapters"]
-        assert len(chapters) == 3
-        assert chapters[0]["title"] == "Introduction"
-        assert chapters[0]["level"] == 1
+        assert len(chapters) == 2  # Section One, Section Two (H1 is title)
+        assert chapters[0]["title"] == "Section One"
+        assert chapters[1]["title"] == "Section Two"
 
     def test_latest_version_when_not_specified(self, sample_docs: Path):
         """Returns metadata for latest version when version=None."""

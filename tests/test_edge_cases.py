@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from alexandria.server import (
+from folios.server import (
     get_document,
     get_document_metadata,
     list_documents,
@@ -85,12 +85,12 @@ class TestListSkipsMalformed:
         create_document(4001, 1, valid_doc_content)
         # Create doc with partial frontmatter (valid structure but missing fields)
         partial_content = """---
-id: 4002
-version: 1
-title: "Partial Doc"
+type: "Guideline"
 ---
 
-# Content
+# Partial Doc
+
+Content here.
 """
         create_document(4002, 1, partial_content)
 
@@ -100,7 +100,7 @@ title: "Partial Doc"
         # Check the partial doc shows NA for missing fields
         partial_doc = next(d for d in result if d.id == 4002)
         assert partial_doc.status == "NA"
-        assert partial_doc.type == "NA"
+        assert partial_doc.title == "Partial Doc"
 
     def test_list_documents_skips_unparseable(
         self,
@@ -164,20 +164,20 @@ class TestPartialMetadata:
         assert doc.id == 5001
         assert doc.title == "Partial Document"
         assert doc.status == "NA"
-        assert doc.type == "NA"
+        # type is "Guideline" in partial_frontmatter_content fixture
+        assert doc.type == "Guideline"
 
     def test_partial_metadata_still_filterable(
         self, set_documents_env: Path, create_document, valid_doc_content: str
     ):
         """Documents with partial metadata still work with filters on available fields."""
         partial_content = """---
-id: 5002
-version: 1
-title: "Has Title"
 status: "Draft"
 ---
 
-# Content
+# Has Title
+
+Content here.
 """
         create_document(5002, 1, partial_content)
 
@@ -233,9 +233,6 @@ class TestFilenameEdgeCases:
     ):
         """Large version numbers handled correctly."""
         content = """---
-id: 6002
-version: 999
-title: "Large Version"
 type: "Guideline"
 author: "Author"
 reviewer: "Reviewer"
@@ -244,7 +241,9 @@ date: "2025-01-01"
 status: "Draft"
 ---
 
-# Content
+# Large Version
+
+Content here.
 """
         create_document(6002, 999, content)
 
@@ -257,9 +256,6 @@ status: "Draft"
     ):
         """Large document IDs handled correctly."""
         content = """---
-id: 999999
-version: 1
-title: "Large ID"
 type: "Guideline"
 author: "Author"
 reviewer: "Reviewer"
@@ -268,7 +264,9 @@ date: "2025-01-01"
 status: "Draft"
 ---
 
-# Content
+# Large ID
+
+Content here.
 """
         create_document(999999, 1, content)
 

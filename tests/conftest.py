@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for Alexandria MCP server tests."""
+"""Shared pytest fixtures for Folios MCP server tests."""
 
 import pytest
 from pathlib import Path
@@ -14,8 +14,8 @@ def documents_path(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def set_documents_env(documents_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """Set ALEXANDRIA_DOCUMENTS_PATH environment variable."""
-    monkeypatch.setenv("ALEXANDRIA_DOCUMENTS_PATH", str(documents_path))
+    """Set FOLIOS_PATH environment variable."""
+    monkeypatch.setenv("FOLIOS_PATH", str(documents_path))
     return documents_path
 
 
@@ -36,9 +36,6 @@ def create_document(documents_path: Path):
 def valid_doc_content() -> str:
     """Return valid document content with complete frontmatter."""
     return """---
-id: 1001
-version: 1
-title: "Test Document"
 type: "Design Practice"
 author: "Test Author"
 reviewer: "Test Reviewer"
@@ -47,7 +44,7 @@ date: "2025-01-01"
 status: "Draft"
 ---
 
-# Introduction
+# Test Document
 
 Test content paragraph.
 
@@ -65,9 +62,6 @@ Final section content.
 def valid_doc_v2_content() -> str:
     """Return valid document content for version 2."""
     return """---
-id: 1001
-version: 2
-title: "Test Document"
 type: "Design Practice"
 author: "Test Author"
 reviewer: "Test Reviewer"
@@ -76,7 +70,7 @@ date: "2025-02-01"
 status: "Approved"
 ---
 
-# Introduction
+# Test Document
 
 Updated test content paragraph with changes.
 
@@ -98,12 +92,10 @@ New section added in v2.
 def partial_frontmatter_content() -> str:
     """Document with missing optional metadata fields."""
     return """---
-id: 1002
-version: 1
-title: "Partial Document"
+type: "Guideline"
 ---
 
-# Content
+# Partial Document
 
 Body text without full metadata.
 """
@@ -113,9 +105,8 @@ Body text without full metadata.
 def malformed_frontmatter_content() -> str:
     """Document with invalid YAML in frontmatter."""
     return """---
-id: not_a_number
-version: [invalid
-title: "Bad YAML
+type: [invalid
+author: "Bad YAML
 ---
 
 # Content
@@ -126,9 +117,8 @@ title: "Bad YAML
 def missing_delimiter_content() -> str:
     """Document missing closing frontmatter delimiter."""
     return """---
-id: 1003
-version: 1
-title: "Missing Delimiter"
+type: "Guideline"
+author: "Test Author"
 """
 
 
@@ -156,9 +146,6 @@ def sample_docs(set_documents_env: Path, create_document, valid_doc_content: str
 
     # Document 1002 - different type and status
     doc_1002 = """---
-id: 1002
-version: 1
-title: "Second Document"
 type: "Guideline"
 author: "Another Author"
 reviewer: "Another Reviewer"
@@ -167,7 +154,7 @@ date: "2025-01-15"
 status: "In Review"
 ---
 
-# Overview
+# Second Document
 
 Second document content.
 """
@@ -175,9 +162,6 @@ Second document content.
 
     # Document 1003 - single version, different author
     doc_1003 = """---
-id: 1003
-version: 1
-title: "Third Document"
 type: "Best Practice"
 author: "Test Author"
 reviewer: "Shared Reviewer"
@@ -186,7 +170,7 @@ date: "2025-01-20"
 status: "Approved"
 ---
 
-# Main
+# Third Document
 
 Third document by same author as doc 1001.
 """

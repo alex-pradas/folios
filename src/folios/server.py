@@ -1,4 +1,4 @@
-"""Alexandria MCP Server.
+"""Folios MCP Server.
 
 FastMCP server providing versioned document retrieval, metadata access,
 and diff capabilities for engineering documents.
@@ -33,9 +33,8 @@ DocumentType = Literal[
 
 
 class Chapter(BaseModel):
-    """Represents a document heading (H1 or H2)."""
+    """Represents a document section heading (H2)."""
 
-    level: int  # 1 or 2
     title: str  # Heading text
 
 
@@ -96,10 +95,10 @@ def get_documents_path() -> Path:
     """Get the documents path from environment or default.
 
     Priority:
-    1. ALEXANDRIA_DOCUMENTS_PATH environment variable
+    1. FOLIOS_PATH environment variable
     2. Default to ./documents in current working directory
     """
-    env_path = os.environ.get("ALEXANDRIA_DOCUMENTS_PATH")
+    env_path = os.environ.get("FOLIOS_PATH")
     if env_path:
         return Path(env_path)
     return Path.cwd() / "documents"
@@ -108,8 +107,11 @@ def get_documents_path() -> Path:
 # Pattern for parsing document filenames: {id}_v{version}.md
 FILENAME_PATTERN = re.compile(r"^(\d+)_v(\d+)\.md$")
 
-# Pattern for parsing H1/H2 headings
-HEADING_PATTERN = re.compile(r"^(#{1,2})\s+(.+)$", re.MULTILINE)
+# Pattern for extracting title (first H1 heading)
+TITLE_PATTERN = re.compile(r"^#\s+(.+)$", re.MULTILINE)
+
+# Pattern for parsing H2 headings (chapters)
+HEADING_PATTERN = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 
 # =============================================================================
 # Storage Functions
@@ -163,28 +165,50 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
     return frontmatter, body
 
 
-def parse_chapters(content: str) -> list[Chapter]:
-    """Extract H1 and H2 headings from document content.
+def parse_title(content: str) -> str:
+    """Extract title from first H1 heading.
 
     Args:
         content: Document body content (without frontmatter).
 
     Returns:
-        List of Chapter objects with level and title.
+        Title string from first H1 heading.
+
+    Raises:
+        ValueError: If no H1 heading is found.
+    """
+    match = TITLE_PATTERN.search(content)
+    if not match:
+        raise ValueError("Document missing title (H1 heading)")
+    return match.group(1).strip()
+
+
+def parse_chapters(content: str) -> list[Chapter]:
+    """Extract H2 headings from document content as chapters.
+
+    Args:
+        content: Document body content (without frontmatter).
+
+    Returns:
+        List of Chapter objects with title.
     """
     chapters = []
     for match in HEADING_PATTERN.finditer(content):
-        level = len(match.group(1))  # Number of # characters
-        title = match.group(2).strip()
-        chapters.append(Chapter(level=level, title=title))
+        title = match.group(1).strip()
+        chapters.append(Chapter(title=title))
     return chapters
 
 
-def parse_document(path: Path) -> tuple[DocumentMetadata, str]:
+def parse_document(path: Path, doc_id: int, version: int) -> tuple[DocumentMetadata, str]:
     """Parse a document file into metadata and content.
+
+    The id and version are derived from the filename, and title is extracted
+    from the first H1 heading in the document body.
 
     Args:
         path: Path to the markdown document file.
+        doc_id: Document ID (from filename).
+        version: Document version (from filename).
 
     Returns:
         Tuple of (DocumentMetadata, body content).
@@ -198,12 +222,13 @@ def parse_document(path: Path) -> tuple[DocumentMetadata, str]:
 
     content = path.read_text(encoding="utf-8")
     frontmatter, body = parse_frontmatter(content)
+    title = parse_title(body)
     chapters = parse_chapters(body)
 
     metadata = DocumentMetadata(
-        id=frontmatter["id"],
-        version=frontmatter["version"],
-        title=frontmatter["title"],
+        id=doc_id,
+        version=version,
+        title=title,
         type=frontmatter["type"],
         author=frontmatter["author"],
         reviewer=frontmatter["reviewer"],
@@ -250,7 +275,7 @@ def get_latest_version(doc_id: int) -> int | None:
     return max(versions) if versions else None
 
 
-def find_document_path(doc_id: int, version: int | None = None) -> Path:
+def find_document_path(doc_id: int, version: int | None = None) -> tuple[Path, int]:
     """Resolve the file path for a document.
 
     Args:
@@ -258,7 +283,7 @@ def find_document_path(doc_id: int, version: int | None = None) -> Path:
         version: Specific version, or None for latest.
 
     Returns:
-        Path to the document file.
+        Tuple of (path to document file, resolved version number).
 
     Raises:
         FileNotFoundError: If document or version doesn't exist.
@@ -273,7 +298,7 @@ def find_document_path(doc_id: int, version: int | None = None) -> Path:
     if not path.exists():
         raise FileNotFoundError(f"Document {doc_id} version {version} not found")
 
-    return path
+    return path, version
 
 
 def scan_documents(
@@ -305,12 +330,12 @@ def scan_documents(
 
         try:
             content = latest_path.read_text(encoding="utf-8")
-            frontmatter, _ = parse_frontmatter(content)
+            frontmatter, body = parse_frontmatter(content)
+            doc_title = parse_title(body)
         except (ValueError, OSError):
             continue  # Skip files that can't be read or parsed
 
         # Extract fields with "NA" defaults for missing values
-        doc_title = frontmatter.get("title", "NA")
         doc_status = frontmatter.get("status", "NA")
         doc_type_val = frontmatter.get("type", "NA")
         doc_author = frontmatter.get("author", "NA")
@@ -379,10 +404,10 @@ def generate_diff(
 # =============================================================================
 
 server = FastMCP(
-    name="alexandria-mcp",
+    name="folios",
     instructions="Retrieve and compare versioned engineering documents. "
     "Documents have metadata (author, status, type) and chapters extracted from headings. "
-    "Set ALEXANDRIA_DOCUMENTS_PATH environment variable to configure the documents folder.",
+    "Set FOLIOS_PATH environment variable to configure the documents folder.",
 )
 
 
@@ -398,7 +423,7 @@ def get_document(id: int, version: int | None = None) -> dict:
         Dict with 'content' key on success, or 'error' key on failure.
     """
     try:
-        path = find_document_path(id, version)
+        path, _ = find_document_path(id, version)
         return {"content": path.read_text(encoding="utf-8")}
     except FileNotFoundError as e:
         return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
@@ -416,8 +441,8 @@ def get_document_metadata(id: int, version: int | None = None) -> dict:
         Dict with 'metadata' key on success, or 'error' key on failure.
     """
     try:
-        path = find_document_path(id, version)
-        metadata, _ = parse_document(path)
+        path, resolved_version = find_document_path(id, version)
+        metadata, _ = parse_document(path, id, resolved_version)
         return {"metadata": metadata.model_dump()}
     except FileNotFoundError as e:
         return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
@@ -446,8 +471,8 @@ def compare_versions(
         Dict with 'result' key on success, or 'error' key on failure.
     """
     try:
-        old_path = find_document_path(id, old_version)
-        new_path = find_document_path(id, new_version)
+        old_path, _ = find_document_path(id, old_version)
+        new_path, _ = find_document_path(id, new_version)
 
         old_content = old_path.read_text(encoding="utf-8")
         new_content = new_path.read_text(encoding="utf-8")
@@ -493,15 +518,15 @@ def list_versions(id: int) -> dict:
         Dict with 'versions' key on success, or 'error' key on failure.
     """
     versions = []
-    for doc_id, _, path in get_all_document_files():
+    for doc_id, version, path in get_all_document_files():
         if doc_id != id:
             continue
 
         try:
-            metadata, _ = parse_document(path)
+            metadata, _ = parse_document(path, doc_id, version)
             versions.append(
                 VersionInfo(
-                    version=metadata.version,
+                    version=version,
                     date=metadata.date,
                     status=metadata.status,
                     author=metadata.author,
@@ -527,7 +552,7 @@ def list_versions(id: int) -> dict:
 
 
 def main():
-    """Run the Alexandria MCP server."""
+    """Run the Folios MCP server."""
     server.run(show_banner=False)
 
 

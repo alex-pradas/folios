@@ -1,6 +1,10 @@
-# Alexandria MCP
+# Folios
 
-A Model Context Protocol (MCP) server for versioned document management. Named after the Great Library of Alexandria, this tool provides AI agents with access to your document library.
+[![PyPI version](https://badge.fury.io/py/folios.svg)](https://badge.fury.io/py/folios)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A Model Context Protocol (MCP) server for versioned document management. Folios provides AI agents with access to your document library.
 
 ## Features
 
@@ -14,10 +18,10 @@ A Model Context Protocol (MCP) server for versioned document management. Named a
 
 ```bash
 # Using uvx (recommended)
-uvx alexandria-mcp
+uvx folios
 
 # Using pip
-pip install alexandria-mcp
+pip install folios
 ```
 
 ## Quick Start
@@ -60,14 +64,14 @@ More content...
 ### 3. Run the server
 
 ```bash
-export ALEXANDRIA_DOCUMENTS_PATH=/path/to/your/documents
-alexandria-mcp
+export FOLIOS_PATH=/path/to/your/documents
+folios
 ```
 
 Or with uvx:
 
 ```bash
-ALEXANDRIA_DOCUMENTS_PATH=/path/to/docs uvx alexandria-mcp
+FOLIOS_PATH=/path/to/docs uvx folios
 ```
 
 ## MCP Tools
@@ -117,7 +121,7 @@ ALEXANDRIA_DOCUMENTS_PATH=/path/to/docs uvx alexandria-mcp
 
 | Environment Variable | Description | Default |
 |---------------------|-------------|---------|
-| `ALEXANDRIA_DOCUMENTS_PATH` | Path to documents folder | `./documents` |
+| `FOLIOS_PATH` | Path to documents folder | `./documents` |
 
 ## Example Usage with Claude Desktop
 
@@ -126,11 +130,11 @@ Add to your Claude Desktop MCP configuration:
 ```json
 {
   "mcpServers": {
-    "alexandria": {
+    "folios": {
       "command": "uvx",
-      "args": ["alexandria-mcp"],
+      "args": ["folios"],
       "env": {
-        "ALEXANDRIA_DOCUMENTS_PATH": "/path/to/your/documents"
+        "FOLIOS_PATH": "/path/to/your/documents"
       }
     }
   }
@@ -140,12 +144,12 @@ Add to your Claude Desktop MCP configuration:
 ## Development
 
 ```bash
-git clone https://github.com/yourusername/alexandria-mcp
-cd alexandria-mcp
+git clone https://github.com/alex-pradas/folios
+cd folios
 uv sync
 
 # Run locally
-ALEXANDRIA_DOCUMENTS_PATH=./examples/documents uv run alexandria-mcp
+FOLIOS_PATH=./examples/documents uv run folios
 
 # Run tests
 uv run pytest
