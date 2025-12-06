@@ -2,7 +2,7 @@
 
 A simple MCP server that gives AI assistants access to your document library.
 
-Point it at a folder of Markdown files, and your AI assistant can browse, search, and compare document versions. It is a poor's man’s document management system designed for easy integration with AI tools. You only need a folder of properly formatted Markdown files as your source. 
+Point it at a folder of Markdown files, and your AI assistant can browse, search, and compare document versions. It is a poor's man’s document management system designed for easy integration with AI tools. You only need a folder of properly formatted Markdown files as your source.
 
 This tool is ideal if you want to give your LLM based Agent read-only access without complex setups. It does not manage the approval cycle or enforce workflows; it simply provides structured access to your documents. It does not version control your files, that has to be done externally (e.g., Git, manual versioning).
 
@@ -173,6 +173,7 @@ More content...
 ### List approved design practices
 
 **Tool call:**
+
 ```json
 {
   "tool": "list_documents",
@@ -184,6 +185,7 @@ More content...
 ```
 
 **Response:**
+
 ```json
 [
   {
@@ -199,6 +201,7 @@ More content...
 ### Get document metadata
 
 **Tool call:**
+
 ```json
 {
   "tool": "get_document_metadata",
@@ -209,6 +212,7 @@ More content...
 ```
 
 **Response:**
+
 ```json
 {
   "metadata": {
@@ -235,6 +239,7 @@ More content...
 ### Diff document versions
 
 **Tool call:**
+
 ```json
 {
   "tool": "diff_document_versions",
@@ -247,6 +252,7 @@ More content...
 ```
 
 **Response:**
+
 ```json
 {
   "diff": "--- 123456_v1.md\n+++ 123456_v2.md\n@@ -1,12 +1,12 @@\n ---\n id: 123456\n-version: 1\n+version: 2\n..."
@@ -256,6 +262,7 @@ More content...
 ### List document versions
 
 **Tool call:**
+
 ```json
 {
   "tool": "list_document_versions",
@@ -266,6 +273,7 @@ More content...
 ```
 
 **Response:**
+
 ```json
 {
   "versions": [

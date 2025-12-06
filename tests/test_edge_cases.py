@@ -200,7 +200,7 @@ class TestEmptyState:
 
     def test_nonexistent_documents_directory(self, tmp_path: Path, monkeypatch):
         """Missing documents directory returns empty list."""
-        monkeypatch.setenv("ALEXANDRIA_DOCUMENTS_PATH", str(tmp_path / "nonexistent"))
+        monkeypatch.setenv("FOLIOS_PATH", str(tmp_path / "nonexistent"))
 
         result = list_documents.fn()
         assert result == []

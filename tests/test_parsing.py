@@ -230,7 +230,7 @@ class TestGetAllDocumentFiles:
 
     def test_nonexistent_directory_returns_empty_list(self, tmp_path: Path, monkeypatch):
         """Missing documents directory returns empty list."""
-        monkeypatch.setenv("ALEXANDRIA_DOCUMENTS_PATH", str(tmp_path / "nonexistent"))
+        monkeypatch.setenv("FOLIOS_PATH", str(tmp_path / "nonexistent"))
         files = get_all_document_files()
         assert files == []
 

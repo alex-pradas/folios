@@ -4,15 +4,20 @@ FastMCP server providing versioned document retrieval, metadata access,
 and diff capabilities for engineering documents.
 """
 
+import argparse
 import difflib
 import os
 import re
+import sys
 from pathlib import Path
 from typing import Literal
 from importlib.metadata import version
 
 from fastmcp import FastMCP
 from pydantic import BaseModel
+
+# Module-level variable for CLI-specified path (set by main())
+_cli_folios_path: Path | None = None
 
 # =============================================================================
 # Type Definitions
@@ -86,16 +91,21 @@ class ErrorResponse(BaseModel):
 
 
 def get_documents_path() -> Path:
-    """Get the documents path from environment or default.
+    """Get the documents path from CLI flag or environment variable.
 
     Priority:
-    1. FOLIOS_PATH environment variable
-    2. Default to ./documents in current working directory
+    1. --folios-path CLI flag
+    2. FOLIOS_PATH environment variable
+
+    Raises:
+        RuntimeError: If no path is configured.
     """
+    if _cli_folios_path is not None:
+        return _cli_folios_path
     env_path = os.environ.get("FOLIOS_PATH")
     if env_path:
         return Path(env_path)
-    return Path.cwd() / "documents"
+    raise RuntimeError("No documents path configured")
 
 
 # Pattern for parsing document filenames: {id}_v{version}.md
@@ -523,6 +533,29 @@ def list_document_versions(document_id: int) -> dict:
 
 def main():
     """Run the Folios MCP server."""
+    global _cli_folios_path
+
+    parser = argparse.ArgumentParser(description="Folios MCP Server")
+    parser.add_argument(
+        "--folios-path",
+        type=Path,
+        help="Path to the folder containing versioned documents",
+    )
+    args = parser.parse_args()
+
+    # Determine path: CLI flag > env var > error
+    if args.folios_path:
+        _cli_folios_path = args.folios_path
+    elif not os.environ.get("FOLIOS_PATH"):
+        print(
+            "Error: No documents folder specified.\n\n"
+            "Please provide the path to your documents folder using either:\n"
+            "  --folios-path /path/to/documents\n"
+            "  FOLIOS_PATH=/path/to/documents environment variable",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     server.run(show_banner=False)
 
 
