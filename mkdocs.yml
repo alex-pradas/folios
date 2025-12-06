@@ -66,5 +66,6 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - API Reference: api-reference.md
   - Document Format: document-format.md
+  - Configuration: configuration.md
+  - API Reference: api-reference.md
