@@ -281,14 +281,13 @@ class TestDiffEdgeCases:
     def test_comparing_same_version_twice(
         self, set_documents_env: Path, create_document, valid_doc_content: str
     ):
-        """Comparing version with itself returns empty diff."""
+        """Comparing version with itself returns no changes."""
         create_document(7001, 1, valid_doc_content)
 
         result = compare_versions.fn(7001, 1, 1)
 
-        assert "result" in result
-        assert result["result"]["unified_diff"] == ""
-        assert "0 lines added, 0 lines removed" in result["result"]["summary"]
+        assert "diff" in result
+        assert result["diff"] == "No changes between versions."
 
     def test_reversed_version_order(
         self, set_documents_env: Path, create_document, valid_doc_content: str, valid_doc_v2_content: str
@@ -300,6 +299,6 @@ class TestDiffEdgeCases:
         # Compare v2 -> v1 (reversed)
         result = compare_versions.fn(7002, 2, 1)
 
-        assert "result" in result
+        assert "diff" in result
         # Diff should show changes, just in reverse direction
-        assert result["result"]["unified_diff"] != ""
+        assert "---" in result["diff"]

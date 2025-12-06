@@ -241,8 +241,7 @@ More content...
   "parameters": {
     "id": 123456,
     "old_version": 1,
-    "new_version": 2,
-    "format": "summary"
+    "new_version": 2
   }
 }
 ```
@@ -250,10 +249,7 @@ More content...
 **Response:**
 ```json
 {
-  "result": {
-    "unified_diff": "",
-    "summary": "16 lines added, 5 lines removed"
-  }
+  "diff": "--- 123456_v1.md\n+++ 123456_v2.md\n@@ -1,12 +1,12 @@\n ---\n id: 123456\n-version: 1\n+version: 2\n..."
 }
 ```
 

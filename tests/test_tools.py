@@ -105,43 +105,25 @@ class TestCompareVersions:
 
     def test_returns_unified_diff(self, sample_docs: Path):
         """Returns unified diff between versions."""
-        result = compare_versions.fn(1001, 1, 2, format="unified")
+        result = compare_versions.fn(1001, 1, 2)
 
-        assert "result" in result
+        assert "diff" in result
         assert "error" not in result
-        assert "---" in result["result"]["unified_diff"]
-        assert "+++" in result["result"]["unified_diff"]
+        assert "---" in result["diff"]
+        assert "+++" in result["diff"]
 
-    def test_returns_summary(self, sample_docs: Path):
-        """Returns summary when format='summary'."""
-        result = compare_versions.fn(1001, 1, 2, format="summary")
-
-        assert "result" in result
-        assert result["result"]["summary"] is not None
-        assert "lines added" in result["result"]["summary"]
-        assert "lines removed" in result["result"]["summary"]
-        assert result["result"]["unified_diff"] == ""
-
-    def test_returns_both_format(self, sample_docs: Path):
-        """Returns diff and summary when format='both'."""
-        result = compare_versions.fn(1001, 1, 2, format="both")
-
-        assert result["result"]["unified_diff"] != ""
-        assert result["result"]["summary"] is not None
-
-    def test_identical_versions_empty_diff(
+    def test_identical_versions_no_changes(
         self, set_documents_env: Path, create_document, valid_doc_content: str
     ):
-        """Comparing identical content returns empty diff."""
+        """Comparing identical content returns no changes message."""
         # Create two versions with identical content
         create_document(2001, 1, valid_doc_content)
         create_document(2001, 2, valid_doc_content)
 
         result = compare_versions.fn(2001, 1, 2)
 
-        assert "result" in result
-        assert result["result"]["unified_diff"] == ""
-        assert "0 lines added, 0 lines removed" in result["result"]["summary"]
+        assert "diff" in result
+        assert result["diff"] == "No changes between versions."
 
     def test_old_version_not_found_returns_error(self, sample_docs: Path):
         """Missing old version returns graceful error."""

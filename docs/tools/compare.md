@@ -1,6 +1,6 @@
 # compare_versions
 
-Generates a diff between two versions of a document.
+Generates a unified diff between two versions of a document.
 
 ## Parameters
 
@@ -9,44 +9,24 @@ Generates a diff between two versions of a document.
 | `id` | integer | Yes | The document ID |
 | `old_version` | integer | Yes | The older version |
 | `new_version` | integer | Yes | The newer version |
-| `format` | string | No | `"unified"`, `"summary"`, or `"both"` (default: `"both"`) |
 
 ## Response
 
-### Default (both)
+### Success
 
 ```json
 {
-  "result": {
-    "unified_diff": "--- old\n+++ new\n@@ -15,6 +15,10 @@\n ## Static Analysis\n...",
-    "summary": "4 lines added, 0 lines removed"
-  }
+  "diff": "--- 123456_v1.md\n+++ 123456_v2.md\n@@ -1,12 +1,12 @@\n..."
 }
 ```
 
-### Unified diff only
+### No changes
 
-With `format="unified"`:
-
-```json
-{
-  "result": {
-    "unified_diff": "--- old\n+++ new\n@@ -15,6 +15,10 @@\n ## Static Analysis\n...",
-    "summary": null
-  }
-}
-```
-
-### Summary only
-
-With `format="summary"`:
+When versions are identical:
 
 ```json
 {
-  "result": {
-    "unified_diff": "",
-    "summary": "45 lines added, 12 lines removed"
-  }
+  "diff": "No changes between versions."
 }
 ```
 
@@ -77,5 +57,5 @@ With `format="summary"`:
 ## Notes
 
 - Uses Python's `difflib` unified diff format
-- Comparing identical versions returns an empty diff
+- Comparing identical versions returns "No changes between versions."
 - Works in either direction (can compare newer to older)

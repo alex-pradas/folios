@@ -72,13 +72,6 @@ class VersionInfo(BaseModel):
     author: str
 
 
-class DiffResult(BaseModel):
-    """Result of comparing two document versions."""
-
-    unified_diff: str
-    summary: str | None = None
-
-
 class ErrorResponse(BaseModel):
     """Structured error for graceful failure responses."""
 
@@ -361,44 +354,6 @@ def scan_documents(
     return summaries
 
 
-def generate_diff(
-    old_content: str, new_content: str, include_summary: bool = True
-) -> DiffResult:
-    """Generate a diff between two document versions.
-
-    Args:
-        old_content: Content of the older version.
-        new_content: Content of the newer version.
-        include_summary: Whether to include a change summary.
-
-    Returns:
-        DiffResult with unified diff and optional summary.
-    """
-    old_lines = old_content.splitlines(keepends=True)
-    new_lines = new_content.splitlines(keepends=True)
-
-    diff_lines = list(
-        difflib.unified_diff(old_lines, new_lines, fromfile="old", tofile="new")
-    )
-    unified_diff = "".join(diff_lines)
-
-    summary = None
-    if include_summary:
-        additions = sum(
-            1
-            for line in diff_lines
-            if line.startswith("+") and not line.startswith("+++")
-        )
-        deletions = sum(
-            1
-            for line in diff_lines
-            if line.startswith("-") and not line.startswith("---")
-        )
-        summary = f"{additions} lines added, {deletions} lines removed"
-
-    return DiffResult(unified_diff=unified_diff, summary=summary)
-
-
 # =============================================================================
 # FastMCP Server
 # =============================================================================
@@ -457,7 +412,6 @@ def compare_versions(
     id: int,
     old_version: int,
     new_version: int,
-    format: str = "both",
 ) -> dict:
     """Compare two versions of a document.
 
@@ -465,10 +419,10 @@ def compare_versions(
         id: The numeric document ID.
         old_version: The older version number.
         new_version: The newer version number.
-        format: Output format - "unified", "summary", or "both".
 
     Returns:
-        Dict with 'result' key on success, or 'error' key on failure.
+        Dict with 'diff' key containing unified diff text on success,
+        or 'error' key on failure.
     """
     try:
         old_path, _ = find_document_path(id, old_version)
@@ -477,13 +431,21 @@ def compare_versions(
         old_content = old_path.read_text(encoding="utf-8")
         new_content = new_path.read_text(encoding="utf-8")
 
-        include_summary = format in ("summary", "both")
-        result = generate_diff(old_content, new_content, include_summary)
+        old_lines = old_content.splitlines(keepends=True)
+        new_lines = new_content.splitlines(keepends=True)
 
-        if format == "summary":
-            result.unified_diff = ""  # Clear diff when only summary requested
+        diff_lines = difflib.unified_diff(
+            old_lines,
+            new_lines,
+            fromfile=f"{id}_v{old_version}.md",
+            tofile=f"{id}_v{new_version}.md",
+        )
+        diff_text = "".join(diff_lines)
 
-        return {"result": result.model_dump()}
+        if not diff_text:
+            return {"diff": "No changes between versions."}
+
+        return {"diff": diff_text}
     except FileNotFoundError as e:
         return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
 
