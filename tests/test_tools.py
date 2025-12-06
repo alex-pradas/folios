@@ -63,7 +63,7 @@ class TestGetDocumentMetadata:
         assert metadata["id"] == 1001
         assert metadata["version"] == 1
         assert metadata["title"] == "Test Document"
-        assert metadata["type"] == "Design Practice"
+        assert metadata["document_type"] == "Design Practice"
         assert metadata["author"] == "Test Author"
         assert metadata["reviewer"] == "Test Reviewer"
         assert metadata["approver"] == "Test Approver"

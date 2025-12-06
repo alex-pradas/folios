@@ -36,7 +36,7 @@ def create_document(documents_path: Path):
 def valid_doc_content() -> str:
     """Return valid document content with complete frontmatter."""
     return """---
-type: "Design Practice"
+document_type: "Design Practice"
 author: "Test Author"
 reviewer: "Test Reviewer"
 approver: "Test Approver"
@@ -62,7 +62,7 @@ Final section content.
 def valid_doc_v2_content() -> str:
     """Return valid document content for version 2."""
     return """---
-type: "Design Practice"
+document_type: "Design Practice"
 author: "Test Author"
 reviewer: "Test Reviewer"
 approver: "Test Approver"
@@ -92,7 +92,7 @@ New section added in v2.
 def partial_frontmatter_content() -> str:
     """Document with missing optional metadata fields."""
     return """---
-type: "Guideline"
+document_type: "Guideline"
 ---
 
 # Partial Document
@@ -105,7 +105,7 @@ Body text without full metadata.
 def malformed_frontmatter_content() -> str:
     """Document with invalid YAML in frontmatter."""
     return """---
-type: [invalid
+document_type: [invalid
 author: "Bad YAML
 ---
 
@@ -117,7 +117,7 @@ author: "Bad YAML
 def missing_delimiter_content() -> str:
     """Document missing closing frontmatter delimiter."""
     return """---
-type: "Guideline"
+document_type: "Guideline"
 author: "Test Author"
 """
 
@@ -138,6 +138,15 @@ def empty_file_content() -> str:
 
 
 @pytest.fixture
+def missing_title_content() -> str:
+    """Document with no H1 title (unparseable)."""
+    return """Just some text without a heading.
+
+More text here.
+"""
+
+
+@pytest.fixture
 def sample_docs(set_documents_env: Path, create_document, valid_doc_content: str, valid_doc_v2_content: str):
     """Create a set of sample documents for testing."""
     # Document 1001 with versions 1 and 2
@@ -146,7 +155,7 @@ def sample_docs(set_documents_env: Path, create_document, valid_doc_content: str
 
     # Document 1002 - different type and status
     doc_1002 = """---
-type: "Guideline"
+document_type: "Guideline"
 author: "Another Author"
 reviewer: "Another Reviewer"
 approver: "Another Approver"
@@ -162,7 +171,7 @@ Second document content.
 
     # Document 1003 - single version, different author
     doc_1003 = """---
-type: "Best Practice"
+document_type: "Best Practice"
 author: "Test Author"
 reviewer: "Shared Reviewer"
 approver: "Shared Approver"

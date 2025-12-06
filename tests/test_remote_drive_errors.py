@@ -644,7 +644,7 @@ class TestEncodingErrors:
         # Create a file with standard name
         (set_documents_env / "8001_v1.md").write_text(
             """---
-type: "Guideline"
+document_type: "Guideline"
 author: "Author"
 reviewer: "Reviewer"
 approver: "Approver"

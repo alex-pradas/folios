@@ -17,16 +17,17 @@ from folios.server import (
 class TestMalformedDocuments:
     """Tests for handling malformed documents."""
 
-    def test_invalid_yaml_frontmatter_returns_error(
+    def test_unusual_yaml_values_accepted(
         self, set_documents_env: Path, create_document, malformed_frontmatter_content: str
     ):
-        """Document with invalid YAML returns graceful error."""
+        """Document with unusual YAML values is accepted with flexible parsing."""
         create_document(3001, 1, malformed_frontmatter_content)
 
         result = get_document_metadata.fn(3001, 1)
 
-        assert "error" in result
-        assert result["error"]["code"] == "INVALID_FORMAT"
+        # Flexible metadata accepts unusual values
+        assert "metadata" in result
+        assert result["metadata"]["id"] == 3001
 
     def test_missing_frontmatter_delimiters_returns_error(
         self, set_documents_env: Path, create_document, missing_delimiter_content: str
@@ -39,16 +40,19 @@ class TestMalformedDocuments:
         assert "error" in result
         assert result["error"]["code"] == "INVALID_FORMAT"
 
-    def test_no_frontmatter_returns_error(
+    def test_no_frontmatter_works_with_defaults(
         self, set_documents_env: Path, create_document, no_frontmatter_content: str
     ):
-        """Document without frontmatter returns error."""
+        """Document without frontmatter works with NA defaults."""
         create_document(3003, 1, no_frontmatter_content)
 
         result = get_document_metadata.fn(3003, 1)
 
-        assert "error" in result
-        assert result["error"]["code"] == "INVALID_FORMAT"
+        assert "metadata" in result
+        assert result["metadata"]["id"] == 3003
+        assert result["metadata"]["title"] == "Just Content"
+        assert result["metadata"]["author"] == "NA"
+        assert result["metadata"]["date"] == "NA"
 
     def test_empty_file_returns_error(
         self, set_documents_env: Path, create_document, empty_file_content: str
@@ -87,7 +91,7 @@ class TestListSkipsMalformed:
         create_document(4001, 1, valid_doc_content)
         # Create doc with partial frontmatter (valid structure but missing fields)
         partial_content = """---
-type: "Guideline"
+document_type: "Guideline"
 ---
 
 # Partial Doc
@@ -109,27 +113,27 @@ Content here.
         set_documents_env: Path,
         create_document,
         valid_doc_content: str,
-        no_frontmatter_content: str,
+        missing_title_content: str,
     ):
         """list_documents excludes documents that can't be parsed at all."""
         create_document(4003, 1, valid_doc_content)
-        create_document(4004, 1, no_frontmatter_content)
+        create_document(4004, 1, missing_title_content)
 
         result = list_documents.fn()
 
         assert len(result) == 1
         assert result[0].id == 4003
 
-    def test_list_versions_skips_malformed_versions(
+    def test_list_versions_skips_unparseable_versions(
         self,
         set_documents_env: Path,
         create_document,
         valid_doc_content: str,
-        malformed_frontmatter_content: str,
+        missing_title_content: str,
     ):
-        """list_versions excludes malformed versions."""
+        """list_versions excludes versions that can't be parsed."""
         create_document(4003, 1, valid_doc_content)
-        create_document(4003, 2, malformed_frontmatter_content)
+        create_document(4003, 2, missing_title_content)
 
         result = list_document_versions.fn(4003)
 
@@ -137,12 +141,28 @@ Content here.
         assert len(result["versions"]) == 1
         assert result["versions"][0]["version"] == 1
 
-    def test_all_versions_malformed_returns_error(
-        self, set_documents_env: Path, create_document, malformed_frontmatter_content: str
+    def test_list_versions_includes_flexible_metadata(
+        self,
+        set_documents_env: Path,
+        create_document,
+        valid_doc_content: str,
+        malformed_frontmatter_content: str,
     ):
-        """If all versions of a document are malformed, list_versions returns error."""
-        create_document(4004, 1, malformed_frontmatter_content)
-        create_document(4004, 2, malformed_frontmatter_content)
+        """list_versions includes versions with unusual but valid frontmatter."""
+        create_document(4005, 1, valid_doc_content)
+        create_document(4005, 2, malformed_frontmatter_content)
+
+        result = list_document_versions.fn(4005)
+
+        assert "versions" in result
+        assert len(result["versions"]) == 2
+
+    def test_all_versions_unparseable_returns_error(
+        self, set_documents_env: Path, create_document, missing_title_content: str
+    ):
+        """If all versions of a document are unparseable, list_versions returns error."""
+        create_document(4004, 1, missing_title_content)
+        create_document(4004, 2, missing_title_content)
 
         result = list_document_versions.fn(4004)
 
@@ -166,8 +186,8 @@ class TestPartialMetadata:
         assert doc.id == 5001
         assert doc.title == "Partial Document"
         assert doc.status == "NA"
-        # type is "Guideline" in partial_frontmatter_content fixture
-        assert doc.type == "Guideline"
+        # document_type is "Guideline" in partial_frontmatter_content fixture
+        assert doc.document_type == "Guideline"
 
     def test_partial_metadata_still_filterable(
         self, set_documents_env: Path, create_document, valid_doc_content: str
@@ -188,24 +208,8 @@ Content here.
         assert len(result) == 1
         assert result[0].id == 5002
 
-        # Type shows NA since not provided
-        assert result[0].type == "NA"
-
-
-class TestEmptyState:
-    """Tests for empty/missing state scenarios."""
-
-    def test_empty_documents_directory(self, set_documents_env: Path):
-        """Empty documents directory returns empty list."""
-        result = list_documents.fn()
-        assert result == []
-
-    def test_nonexistent_documents_directory(self, tmp_path: Path, monkeypatch):
-        """Missing documents directory returns empty list."""
-        monkeypatch.setenv("FOLIOS_PATH", str(tmp_path / "nonexistent"))
-
-        result = list_documents.fn()
-        assert result == []
+        # document_type shows NA since not provided
+        assert result[0].document_type == "NA"
 
 
 class TestFilenameEdgeCases:
@@ -235,7 +239,7 @@ class TestFilenameEdgeCases:
     ):
         """Large version numbers handled correctly."""
         content = """---
-type: "Guideline"
+document_type: "Guideline"
 author: "Author"
 reviewer: "Reviewer"
 approver: "Approver"
@@ -258,7 +262,7 @@ Content here.
     ):
         """Large document IDs handled correctly."""
         content = """---
-type: "Guideline"
+document_type: "Guideline"
 author: "Author"
 reviewer: "Reviewer"
 approver: "Approver"

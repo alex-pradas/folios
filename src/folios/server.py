@@ -9,8 +9,9 @@ import difflib
 import os
 import re
 import sys
+import tomllib
 from pathlib import Path
-from typing import Literal
+from typing import Any
 from importlib.metadata import version
 
 from fastmcp import FastMCP
@@ -19,22 +20,9 @@ from pydantic import BaseModel
 # Module-level variable for CLI-specified path (set by main())
 _cli_folios_path: Path | None = None
 
-# =============================================================================
-# Type Definitions
-# =============================================================================
-
-DocumentStatus = Literal["Draft", "In Review", "Approved", "Withdrawn"]
-"""Valid document statuses: Draft, In Review, Approved, Withdrawn."""
-
-DocumentType = Literal[
-    "Design Practice",
-    "Guideline",
-    "Best Practice",
-    "TRS",
-    "DVP",
-    "DVR",
-]
-"""Valid document types: Design Practice, Guideline, Best Practice, TRS, DVP, DVR."""
+# Module-level cache for configuration
+_config_cache: dict | None = None
+_config_loaded: bool = False
 
 # =============================================================================
 # Pydantic Models
@@ -47,38 +35,23 @@ class Chapter(BaseModel):
     title: str  # Heading text
 
 
-class DocumentMetadata(BaseModel):
-    """Full document metadata including chapters."""
-
-    id: int
-    version: int
-    title: str
-    type: DocumentType
-    author: str
-    reviewer: str
-    approver: str
-    date: str
-    status: DocumentStatus
-    chapters: list[Chapter]  # Parsed from H1/H2 headings
-
-
 class DocumentSummary(BaseModel):
     """Summary for list_documents results."""
 
     id: int
     title: str = "NA"
     latest_version: int
-    status: str = "NA"  # Allow "NA" for missing fields
-    type: str = "NA"  # Allow "NA" for missing fields
+    status: str = "NA"
+    document_type: str = "NA"
 
 
 class VersionInfo(BaseModel):
     """Version information for list_versions results."""
 
     version: int
-    date: str
-    status: DocumentStatus
-    author: str
+    date: str = "NA"
+    status: str = "NA"
+    author: str = "NA"
 
 
 class ErrorResponse(BaseModel):
@@ -140,6 +113,56 @@ def get_documents_path() -> Path:
     raise RuntimeError("No documents path configured")
 
 
+def load_config() -> dict[str, Any] | None:
+    """Load configuration from folios.toml in the documents folder.
+
+    Returns:
+        Configuration dict if folios.toml exists, None otherwise.
+        Returns cached config on subsequent calls.
+    """
+    global _config_cache, _config_loaded
+
+    if _config_loaded:
+        return _config_cache
+
+    _config_loaded = True
+
+    try:
+        config_path = get_documents_path() / "folios.toml"
+        if config_path.exists():
+            with open(config_path, "rb") as f:
+                _config_cache = tomllib.load(f)
+            return _config_cache
+    except (RuntimeError, OSError):
+        # No documents path configured or can't read config
+        pass
+
+    return None
+
+
+def get_field_values(field_name: str) -> list[str] | None:
+    """Get allowed values for a field from configuration.
+
+    Args:
+        field_name: The field name to look up (e.g., 'status', 'document_type').
+
+    Returns:
+        List of allowed values if configured, None otherwise.
+    """
+    config = load_config()
+    if config and "fields" in config:
+        field_config = config["fields"].get(field_name, {})
+        return field_config.get("values")
+    return None
+
+
+def reset_config_cache() -> None:
+    """Reset the configuration cache. Useful for testing."""
+    global _config_cache, _config_loaded
+    _config_cache = None
+    _config_loaded = False
+
+
 # Pattern for parsing document filenames: {id}_v{version}.md
 FILENAME_PATTERN = re.compile(r"^(\d+)_v(\d+)\.md$")
 
@@ -164,14 +187,15 @@ def parse_frontmatter(content: str) -> tuple[dict, str]:
         Tuple of (frontmatter dict, body content).
 
     Raises:
-        ValueError: If frontmatter is missing or invalid.
+        ValueError: If frontmatter delimiters are malformed (started but not closed).
     """
+    # No frontmatter - return empty dict and full content as body
     if not content.startswith("---"):
-        raise ValueError("Document missing YAML frontmatter")
+        return {}, content.strip()
 
     parts = content.split("---", 2)
     if len(parts) < 3:
-        raise ValueError("Invalid frontmatter format")
+        raise ValueError("Invalid frontmatter format: missing closing delimiter")
 
     frontmatter_text = parts[1].strip()
     body = parts[2].strip()
@@ -235,7 +259,7 @@ def parse_chapters(content: str) -> list[Chapter]:
     return chapters
 
 
-def parse_document(path: Path, doc_id: int, version: int) -> tuple[DocumentMetadata, str]:
+def parse_document(path: Path, doc_id: int, doc_version: int) -> tuple[dict[str, Any], str]:
     """Parse a document file into metadata and content.
 
     The id and version are derived from the filename, and title is extracted
@@ -244,10 +268,12 @@ def parse_document(path: Path, doc_id: int, version: int) -> tuple[DocumentMetad
     Args:
         path: Path to the markdown document file.
         doc_id: Document ID (from filename).
-        version: Document version (from filename).
+        doc_version: Document version (from filename).
 
     Returns:
-        Tuple of (DocumentMetadata, body content).
+        Tuple of (metadata dict, body content).
+        Metadata always includes: id, version, title, author, date, chapters.
+        Additional frontmatter fields are included dynamically.
 
     Raises:
         FileNotFoundError: If document file doesn't exist.
@@ -261,18 +287,20 @@ def parse_document(path: Path, doc_id: int, version: int) -> tuple[DocumentMetad
     title = parse_title(body)
     chapters = parse_chapters(body)
 
-    metadata = DocumentMetadata(
-        id=doc_id,
-        version=version,
-        title=title,
-        type=frontmatter["type"],
-        author=frontmatter["author"],
-        reviewer=frontmatter["reviewer"],
-        approver=frontmatter["approver"],
-        date=frontmatter["date"],
-        status=frontmatter["status"],
-        chapters=chapters,
-    )
+    # Build metadata dict with core fields first
+    metadata: dict[str, Any] = {
+        "id": doc_id,
+        "version": doc_version,
+        "title": title,
+        "author": frontmatter.get("author", "NA"),
+        "date": frontmatter.get("date", "NA"),
+        "chapters": [{"title": ch.title} for ch in chapters],
+    }
+
+    # Add all other frontmatter fields dynamically
+    for key, value in frontmatter.items():
+        if key not in ("author", "date"):  # Already handled above
+            metadata[key] = value
 
     return metadata, body
 
@@ -389,7 +417,7 @@ def scan_documents(
 
         # Extract fields with "NA" defaults for missing values
         doc_status = frontmatter.get("status", "NA")
-        doc_type_val = frontmatter.get("type", "NA")
+        doc_type_val = frontmatter.get("document_type", "NA")
         doc_author = frontmatter.get("author", "NA")
 
         # Apply filters (skip filter if field is "NA")
@@ -406,7 +434,7 @@ def scan_documents(
                 title=doc_title,
                 latest_version=latest_version,
                 status=doc_status,
-                type=doc_type_val,
+                document_type=doc_type_val,
             )
         )
 
@@ -421,7 +449,7 @@ __version__ = version("folios")
 server = FastMCP(
     name="folios",
     instructions="Retrieve and compare versioned engineering documents. "
-    "Documents have metadata (author, status, type) and chapters extracted from headings. "
+    "Documents have metadata (author, status, document_type) and chapters extracted from headings. "
     "Set FOLIOS_PATH environment variable to configure the documents folder.",
     version=__version__,
 )
@@ -480,14 +508,17 @@ def get_document_content(document_id: int, version: int | None = None) -> dict:
 
 @server.tool
 def get_document_metadata(document_id: int, version: int | None = None) -> dict:
-    """Retrieve metadata for a document including title, author, status, and chapters.
+    """Retrieve metadata for a document including title, author, and chapters.
 
     Args:
         document_id: Unique numeric identifier of the document.
         version: Specific version number. If not provided, returns metadata for the latest version.
 
     Returns:
-        On success: {"metadata": {id, version, title, type, author, reviewer, approver, date, status, chapters}}
+        On success: {"metadata": {id, version, title, author, date, chapters, ...}}
+            Core fields (id, version, title, author, date, chapters) are always present.
+            Author and date show "NA" if not in frontmatter.
+            Additional frontmatter fields are included dynamically.
         On error: {"error": {"code": "NOT_FOUND"|"INVALID_FORMAT"|"READ_ERROR", "message": "..."}}
 
     Example:
@@ -503,13 +534,12 @@ def get_document_metadata(document_id: int, version: int | None = None) -> dict:
             "id": 123456,
             "version": 2,
             "title": "Stress Analysis Design Practice",
-            "type": "Design Practice",
             "author": "J. Smith",
-            "reviewer": "A. Johnson",
-            "approver": "M. Williams",
             "date": "2025-02-15",
+            "chapters": [{"title": "Scope"}, {"title": "Methodology"}],
+            "document_type": "Design Practice",
             "status": "Approved",
-            "chapters": [{"title": "Scope"}, {"title": "Methodology"}]
+            "reviewer": "A. Johnson"
           }
         }
         ```
@@ -517,7 +547,7 @@ def get_document_metadata(document_id: int, version: int | None = None) -> dict:
     try:
         path, resolved_version = find_document_path(document_id, version)
         metadata, _ = parse_document(path, document_id, resolved_version)
-        return {"metadata": metadata.model_dump()}
+        return {"metadata": metadata}
     except FileNotFoundError as e:
         return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
     except (ValueError, KeyError) as e:
@@ -604,13 +634,19 @@ def list_documents(
     """List all documents with optional filtering.
 
     Args:
-        status: Filter by document status (Draft, In Review, Approved, Withdrawn).
-        document_type: Filter by document type (Design Practice, Guideline, TRS, etc.).
+        status: Filter by document status. Common values: Draft, In Review, Approved, Withdrawn.
+            Accepts any string value from document frontmatter.
+        document_type: Filter by document type. Common values: Design Practice, Guideline, TRS.
+            Accepts any string value from document frontmatter.
         author: Filter by author name (case-insensitive substring match).
 
     Returns:
-        List of documents with {id, title, latest_version, status, type} for each.
+        List of documents with {id, title, latest_version, status, document_type} for each.
         Returns empty list if no documents match the filters.
+        Fields show "NA" if not present in document frontmatter.
+
+    Note:
+        Valid values for status and document_type can be configured in folios.toml.
 
     Example:
         Tool call:
@@ -621,8 +657,8 @@ def list_documents(
         Response:
         ```json
         [
-          {"id": 123456, "title": "Stress Analysis", "latest_version": 2, "status": "Approved", "type": "Design Practice"},
-          {"id": 789012, "title": "Fatigue Analysis", "latest_version": 1, "status": "Approved", "type": "Design Practice"}
+          {"id": 123456, "title": "Stress Analysis", "latest_version": 2, "status": "Approved", "document_type": "Design Practice"},
+          {"id": 789012, "title": "Fatigue Analysis", "latest_version": 1, "status": "Approved", "document_type": "Design Practice"}
         ]
         ```
     """
@@ -657,18 +693,18 @@ def list_document_versions(document_id: int) -> dict:
         ```
     """
     versions = []
-    for doc_id, version, path in get_all_document_files():
+    for doc_id, doc_version, path in get_all_document_files():
         if doc_id != document_id:
             continue
 
         try:
-            metadata, _ = parse_document(path, doc_id, version)
+            metadata, _ = parse_document(path, doc_id, doc_version)
             versions.append(
                 VersionInfo(
-                    version=version,
-                    date=metadata.date,
-                    status=metadata.status,
-                    author=metadata.author,
+                    version=doc_version,
+                    date=metadata.get("date", "NA"),
+                    status=metadata.get("status", "NA"),
+                    author=metadata.get("author", "NA"),
                 )
             )
         except (ValueError, KeyError, OSError):

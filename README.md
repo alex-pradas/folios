@@ -21,7 +21,7 @@ If you are developing agentic workflows, in order to mock the functionality to g
 
 - **Zero Config** - Just point to a folder of Markdown files and go
 - **Local First** - Your documents stay on your machine or network, no cloud dependencies
-- **Minimal Maintenance** - No complex setup, no database, no indexing, all within the document.
+- **Flexible Metadata** - Use any frontmatter fields your workflow needs
 - **Versioned Documents** - Store multiple versions with simple `{id}_v{version}.md` naming
 
 ## One-liner to install, run and configure
@@ -45,20 +45,18 @@ documents/
 
 ### 2. Add YAML frontmatter to each document
 
+Frontmatter is flexible - include any fields your workflow requires:
+
 ```markdown
 ---
-id: 123456
-version: 1
-title: "Stress Analysis Design Practice"
-type: "Design Practice"
 author: "J. Smith"
-reviewer: "A. Johnson"
-approver: "M. Williams"
 date: "2025-01-15"
+document_type: "Design Practice"
 status: "Approved"
+reviewer: "A. Johnson"
 ---
 
-# This is the Document Title
+# Stress Analysis Design Practice
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 
@@ -66,6 +64,8 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 
 More text here...
 ```
+
+Only the `---` delimiters and an H1 title are required. Missing fields show "NA" in responses.
 
 ### 3. Run the server
 
@@ -102,38 +102,31 @@ We have tested it with [Claude Desktop](https://claude.ai/desktop) and the [GitH
 
 ## Document Schema
 
-### Metadata Fields
+### Core Metadata Fields
+
+These fields are always present in metadata responses:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | int | Unique document identifier |
-| `version` | int | Version number (sequential integers) |
-| `title` | str | Document title |
-| `type` | str | Document type |
-| `author` | str | Document author |
-| `reviewer` | str | Document reviewer |
-| `approver` | str | Document approver |
-| `date` | str | Date (ISO format recommended) |
-| `status` | str | Document status |
-| `chapters` | list | Auto-parsed from H1/H2 headings |
+| `id` | int | Unique document identifier (from filename) |
+| `version` | int | Version number (from filename) |
+| `title` | str | Document title (from H1 heading) |
+| `author` | str | Document author ("NA" if not in frontmatter) |
+| `date` | str | Publication date ("NA" if not in frontmatter) |
+| `chapters` | list | Auto-parsed from H2 headings |
 
-### Document Types
+### Dynamic Fields
 
-- `Design Practice` - Standard design methodology
-- `Guideline` - Recommended approaches
-- `Best Practice` - Industry best practices
-- `TRS` - Technical Requirement Specification
-- `DVP` - Design Verification Plan
-- `DVR` - Detail Verification Review
+Any additional frontmatter fields are included in metadata responses. Common examples:
 
-### Document Statuses
-
-- `Draft` - Work in progress
-- `In Review` - Under review
-- `Approved` - Approved for use
-- `Withdrawn` - No longer valid
+- `document_type` - Document type (Design Practice, Guideline, etc.)
+- `status` - Document status (Draft, Approved, etc.)
+- `reviewer`, `approver` - Approval workflow fields
+- Custom fields for your specific workflow
 
 ## Configuration
+
+### Documents Path
 
 Provide the documents folder path via CLI flag or environment variable:
 
@@ -141,6 +134,23 @@ Provide the documents folder path via CLI flag or environment variable:
 |--------|-------------|
 | `--folios-path` | Path to documents folder (CLI flag) |
 | `FOLIOS_PATH` | Path to documents folder (environment variable) |
+
+### Field Configuration (Optional)
+
+Create a `folios.toml` in your documents folder to define allowed values for fields:
+
+```toml
+[fields.status]
+values = ["Draft", "In Review", "Approved", "Withdrawn"]
+
+[fields.document_type]
+values = ["Design Practice", "Guideline", "Best Practice", "TRS"]
+
+[fields.department]
+values = ["Engineering", "Manufacturing", "HR"]
+```
+
+This helps agents understand what values are valid for each field.
 
 ## Development
 

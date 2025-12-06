@@ -10,7 +10,6 @@ from folios.server import (
     parse_document,
     find_document_path,
     get_all_document_files,
-    get_latest_version,
     Chapter,
 )
 
@@ -22,26 +21,28 @@ class TestParseFrontmatter:
         """Parse complete valid frontmatter."""
         frontmatter, body = parse_frontmatter(valid_doc_content)
 
-        assert frontmatter["type"] == "Design Practice"
+        assert frontmatter["document_type"] == "Design Practice"
         assert frontmatter["author"] == "Test Author"
         assert frontmatter["status"] == "Draft"
         assert "# Test Document" in body
 
-    def test_missing_frontmatter_raises_valueerror(self):
-        """Document without --- prefix raises ValueError."""
+    def test_no_frontmatter_returns_empty_dict(self):
+        """Document without frontmatter returns empty dict and full content."""
         content = "# Just a heading\n\nNo frontmatter here."
-        with pytest.raises(ValueError, match="missing YAML frontmatter"):
-            parse_frontmatter(content)
+        frontmatter, body = parse_frontmatter(content)
+        assert frontmatter == {}
+        assert "# Just a heading" in body
+        assert "No frontmatter here" in body
 
-    def test_invalid_frontmatter_format_raises_valueerror(self, missing_delimiter_content: str):
-        """Document with missing closing delimiter raises ValueError."""
+    def test_unclosed_frontmatter_raises_valueerror(self, missing_delimiter_content: str):
+        """Document with unclosed frontmatter delimiter raises ValueError."""
         with pytest.raises(ValueError, match="Invalid frontmatter format"):
             parse_frontmatter(missing_delimiter_content)
 
     def test_quoted_values_unquoted(self):
         """Values in quotes should have quotes removed."""
         content = '''---
-type: "Quoted Type"
+document_type: "Quoted Type"
 author: 'Single Quoted'
 ---
 
@@ -50,13 +51,13 @@ author: 'Single Quoted'
 Body.
 '''
         frontmatter, _ = parse_frontmatter(content)
-        assert frontmatter["type"] == "Quoted Type"
+        assert frontmatter["document_type"] == "Quoted Type"
         assert frontmatter["author"] == "Single Quoted"
 
     def test_numeric_values_converted(self):
         """Numeric strings converted to integers."""
         content = '''---
-type: "Test"
+document_type: "Test"
 priority: 42
 ---
 
@@ -83,7 +84,7 @@ Body content.
         """Comment lines in frontmatter should be skipped."""
         content = """---
 # This is a comment
-type: "Guideline"
+document_type: "Guideline"
 # Another comment
 author: "Test"
 ---
@@ -92,14 +93,14 @@ author: "Test"
 """
         frontmatter, body = parse_frontmatter(content)
 
-        assert frontmatter["type"] == "Guideline"
+        assert frontmatter["document_type"] == "Guideline"
         assert frontmatter["author"] == "Test"
-        assert len(frontmatter) == 2  # Only type and author, no comments
+        assert len(frontmatter) == 2  # Only document_type and author, no comments
 
     def test_frontmatter_with_lines_missing_colon_skips_them(self):
         """Lines without colons in frontmatter should be skipped."""
         content = """---
-type: "Guideline"
+document_type: "Guideline"
 this line has no colon
 author: "Test"
 another malformed line
@@ -109,7 +110,7 @@ another malformed line
 """
         frontmatter, body = parse_frontmatter(content)
 
-        assert frontmatter["type"] == "Guideline"
+        assert frontmatter["document_type"] == "Guideline"
         assert frontmatter["author"] == "Test"
         assert len(frontmatter) == 2  # Only valid key:value pairs
 
@@ -117,7 +118,7 @@ another malformed line
         """Empty lines in frontmatter should be skipped."""
         content = """---
 
-type: "Guideline"
+document_type: "Guideline"
 
 author: "Test"
 
@@ -127,7 +128,7 @@ author: "Test"
 """
         frontmatter, body = parse_frontmatter(content)
 
-        assert frontmatter["type"] == "Guideline"
+        assert frontmatter["document_type"] == "Guideline"
         assert frontmatter["author"] == "Test"
 
 
@@ -197,17 +198,17 @@ class TestParseDocument:
     def test_valid_document_returns_metadata_and_body(
         self, set_documents_env: Path, create_document, valid_doc_content: str
     ):
-        """Complete document returns DocumentMetadata and body."""
+        """Complete document returns metadata dict and body."""
         path = create_document(1001, 1, valid_doc_content)
         metadata, body = parse_document(path, 1001, 1)
 
-        assert metadata.id == 1001
-        assert metadata.version == 1
-        assert metadata.title == "Test Document"
-        assert metadata.type == "Design Practice"
-        assert metadata.author == "Test Author"
-        assert metadata.status == "Draft"
-        assert len(metadata.chapters) == 2  # Section One, Section Two (H1 is title)
+        assert metadata["id"] == 1001
+        assert metadata["version"] == 1
+        assert metadata["title"] == "Test Document"
+        assert metadata["document_type"] == "Design Practice"
+        assert metadata["author"] == "Test Author"
+        assert metadata["status"] == "Draft"
+        assert len(metadata["chapters"]) == 2  # Section One, Section Two (H1 is title)
         assert "Test content paragraph" in body
 
     def test_nonexistent_file_raises_filenotfound(self, tmp_path: Path):
@@ -216,21 +217,38 @@ class TestParseDocument:
         with pytest.raises(FileNotFoundError, match="not found"):
             parse_document(fake_path, 1001, 1)
 
-    def test_invalid_frontmatter_raises_valueerror(
+    def test_no_frontmatter_uses_defaults(
         self, set_documents_env: Path, create_document, no_frontmatter_content: str
     ):
-        """Document without frontmatter raises ValueError."""
+        """Document without frontmatter works with NA defaults."""
         path = create_document(9999, 1, no_frontmatter_content)
-        with pytest.raises(ValueError):
-            parse_document(path, 9999, 1)
+        metadata, body = parse_document(path, 9999, 1)
 
-    def test_missing_required_field_raises_keyerror(
+        assert metadata["id"] == 9999
+        assert metadata["title"] == "Just Content"
+        assert metadata["author"] == "NA"
+        assert metadata["date"] == "NA"
+
+    def test_missing_title_raises_valueerror(
+        self, set_documents_env: Path, create_document, missing_title_content: str
+    ):
+        """Document without H1 title raises ValueError."""
+        path = create_document(9998, 1, missing_title_content)
+        with pytest.raises(ValueError, match="missing title"):
+            parse_document(path, 9998, 1)
+
+    def test_partial_frontmatter_uses_defaults(
         self, set_documents_env: Path, create_document, partial_frontmatter_content: str
     ):
-        """Missing required frontmatter field raises KeyError."""
+        """Missing frontmatter fields use 'NA' defaults."""
         path = create_document(1002, 1, partial_frontmatter_content)
-        with pytest.raises(KeyError):
-            parse_document(path, 1002, 1)
+        metadata, _ = parse_document(path, 1002, 1)
+
+        # Core fields have defaults
+        assert metadata["author"] == "NA"
+        assert metadata["date"] == "NA"
+        # Available fields are included
+        assert metadata["document_type"] == "Guideline"
 
 
 class TestFindDocumentPath:
@@ -274,11 +292,6 @@ class TestGetAllDocumentFiles:
         doc_ids = {f[0] for f in files}
         assert doc_ids == {1001, 1002, 1003}
 
-    def test_empty_directory_returns_empty_list(self, set_documents_env: Path):
-        """Empty documents directory returns empty list."""
-        files = get_all_document_files()
-        assert files == []
-
     def test_nonexistent_directory_returns_empty_list(self, tmp_path: Path, monkeypatch):
         """Missing documents directory returns empty list."""
         monkeypatch.setenv("FOLIOS_PATH", str(tmp_path / "nonexistent"))
@@ -294,22 +307,3 @@ class TestGetAllDocumentFiles:
 
         files = get_all_document_files()
         assert files == []
-
-
-class TestGetLatestVersion:
-    """Tests for get_latest_version function."""
-
-    def test_returns_highest_version(self, sample_docs: Path):
-        """Returns highest version number for document."""
-        version = get_latest_version(1001)
-        assert version == 2
-
-    def test_single_version_document(self, sample_docs: Path):
-        """Returns version for document with single version."""
-        version = get_latest_version(1002)
-        assert version == 1
-
-    def test_nonexistent_document_returns_none(self, sample_docs: Path):
-        """Returns None for non-existent document."""
-        version = get_latest_version(9999)
-        assert version is None
