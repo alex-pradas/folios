@@ -170,63 +170,123 @@ More content...
 
 ## Example Interaction
 
-Once configured, you can ask your AI assistant:
+### List approved design practices
 
-**"List all approved design practices"**
+**Tool call:**
+```json
+{
+  "tool": "list_documents",
+  "parameters": {
+    "status": "Approved",
+    "type": "Design Practice"
+  }
+}
+```
 
+**Response:**
 ```json
 [
   {
-    "id": "123456",
-    "title": "Stress Analysis Design Practice",
-    "type": "Design Practice",
-    "status": "Approved",
+    "id": 123456,
+    "title": "Introduction",
     "latest_version": 2,
-    "author": "J. Smith",
-    "date": "2025-02-15"
-  }
-]
-```
-
-**"Show me the latest version of document 123456"**
-
-```
-# Introduction
-
-This document defines the stress analysis design practice for
-turbine rear structure components.
-
-## Purpose
-
-The purpose of this design practice is to establish standardized
-methods for conducting stress analysis on TRS components.
-...
-```
-
-**"What changed between version 1 and version 2 of document 123456?"**
-
-```
-Summary of changes:
-- Added "vanes, hub, and outer case" to scope
-- Added non-linear analysis option for contact regions
-- Added "Emergency shutdown" load case
-- Added new "Thermal Analysis" section
-- Added fatigue life requirement (20,000 cycles minimum)
-- Added References section with ASTM and MIL-HDBK standards
-```
-
-**"Find all documents by J. Smith"**
-
-```json
-[
-  {
-    "id": "123456",
-    "title": "Stress Analysis Design Practice",
-    "type": "Design Practice",
     "status": "Approved",
-    "latest_version": 2
+    "type": "Design Practice"
   }
 ]
+```
+
+### Get document metadata
+
+**Tool call:**
+```json
+{
+  "tool": "get_document_metadata",
+  "parameters": {
+    "id": 123456
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "metadata": {
+    "id": 123456,
+    "version": 2,
+    "title": "Introduction",
+    "type": "Design Practice",
+    "author": "J. Smith",
+    "reviewer": "A. Johnson",
+    "approver": "M. Williams",
+    "date": "2025-02-15",
+    "status": "Approved",
+    "chapters": [
+      {"title": "Purpose"},
+      {"title": "Scope"},
+      {"title": "Static Analysis"},
+      {"title": "Fatigue Analysis"},
+      {"title": "Thermal Analysis"}
+    ]
+  }
+}
+```
+
+### Compare versions
+
+**Tool call:**
+```json
+{
+  "tool": "compare_versions",
+  "parameters": {
+    "id": 123456,
+    "old_version": 1,
+    "new_version": 2,
+    "format": "summary"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "result": {
+    "unified_diff": "",
+    "summary": "16 lines added, 5 lines removed"
+  }
+}
+```
+
+### List all versions of a document
+
+**Tool call:**
+```json
+{
+  "tool": "list_versions",
+  "parameters": {
+    "id": 123456
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "versions": [
+    {
+      "version": 1,
+      "date": "2025-01-10",
+      "status": "Approved",
+      "author": "J. Smith"
+    },
+    {
+      "version": 2,
+      "date": "2025-02-15",
+      "status": "Approved",
+      "author": "J. Smith"
+    }
+  ]
+}
 ```
 
 ## More Information
