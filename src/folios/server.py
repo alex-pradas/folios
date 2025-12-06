@@ -17,7 +17,7 @@ from importlib.metadata import version
 from fastmcp import FastMCP
 from fastmcp.resources import FunctionResource
 from fastmcp.utilities.logging import get_logger
-from pydantic import BaseModel
+from pydantic import BaseModel, AnyUrl
 
 logger = get_logger("folios")
 
@@ -791,7 +791,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
 
                 server.add_resource(
                     FunctionResource(
-                        uri=f"folios://documents/{doc_id}/v{doc_version}",
+                        uri=AnyUrl(f"folios://documents/{doc_id}/v{doc_version}"),
                         name=f"{title} (v{doc_version})",
                         description=f"Author: {author} | Status: {status} | Type: {doc_type}",
                         mime_type="text/markdown",
