@@ -34,6 +34,19 @@ theme:
 
 plugins:
   - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 2
+            members_order: source
+            show_signature_annotations: true
+            separate_signature: true
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -55,10 +68,11 @@ nav:
   - Home: index.md
   - Tools:
       - Overview: tools/index.md
-      - get_document: tools/get-document.md
+      - get_document_content: tools/get-document.md
       - get_document_metadata: tools/get-metadata.md
       - list_documents: tools/list-documents.md
-      - list_versions: tools/list-versions.md
-      - compare_versions: tools/compare.md
+      - list_document_versions: tools/list-versions.md
+      - diff_document_versions: tools/compare.md
+  - API Reference: api-reference.md
   - Document Format: document-format.md
   - Configuration: configuration.md

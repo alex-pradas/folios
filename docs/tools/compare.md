@@ -54,8 +54,20 @@ When versions are identical:
 }
 ```
 
+**Read error (permission denied, network error, etc.):**
+
+```json
+{
+  "error": {
+    "code": "READ_ERROR",
+    "message": "[ESTALE] Stale file handle (file: /path/to/document.md)"
+  }
+}
+```
+
 ## Notes
 
 - Uses Python's `difflib` unified diff format
 - Comparing identical versions returns "No changes between versions."
 - Works in either direction (can compare newer to older)
+- Gracefully handles remote drive errors (network issues, permission changes)
