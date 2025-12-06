@@ -9,6 +9,7 @@ import os
 import re
 from pathlib import Path
 from typing import Literal
+from importlib.metadata import version
 
 from fastmcp import FastMCP
 from pydantic import BaseModel
@@ -353,16 +354,18 @@ def scan_documents(
 
     return summaries
 
-
 # =============================================================================
 # FastMCP Server
 # =============================================================================
+
+__version__ = version("folios")
 
 server = FastMCP(
     name="folios",
     instructions="Retrieve and compare versioned engineering documents. "
     "Documents have metadata (author, status, type) and chapters extracted from headings. "
     "Set FOLIOS_PATH environment variable to configure the documents folder.",
+    version=__version__,
 )
 
 
