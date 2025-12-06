@@ -1,6 +1,8 @@
 # Folios
 
 [![PyPI version](https://badge.fury.io/py/folios.svg)](https://badge.fury.io/py/folios)
+[![Tests](https://github.com/alex-pradas/folios/actions/workflows/publish.yml/badge.svg)](https://github.com/alex-pradas/folios/actions/workflows/publish.yml)
+[![codecov](https://codecov.io/gh/alex-pradas/folios/branch/main/graph/badge.svg)](https://codecov.io/gh/alex-pradas/folios)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
