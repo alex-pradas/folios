@@ -81,8 +81,37 @@ class VersionInfo(BaseModel):
 class ErrorResponse(BaseModel):
     """Structured error for graceful failure responses."""
 
-    code: str  # "NOT_FOUND", "INVALID_FORMAT", "MISSING_FIELD"
+    code: str  # "NOT_FOUND", "INVALID_FORMAT", "MISSING_FIELD", "READ_ERROR"
     message: str
+
+
+def format_os_error(error: OSError) -> str:
+    """Format an OSError into a human-readable message.
+
+    Args:
+        error: The OSError (or subclass) to format.
+
+    Returns:
+        Human-readable error message with context.
+    """
+    # Get the error name from errno if available
+    error_name = ""
+    if error.errno is not None:
+        import errno as errno_module
+        error_name = errno_module.errorcode.get(error.errno, "")
+
+    # Build informative message
+    parts = []
+    if error_name:
+        parts.append(f"[{error_name}]")
+    if error.strerror:
+        parts.append(error.strerror)
+    elif str(error):
+        parts.append(str(error))
+    if error.filename:
+        parts.append(f"(file: {error.filename})")
+
+    return " ".join(parts) if parts else "Unknown I/O error"
 
 
 # =============================================================================
@@ -250,18 +279,34 @@ def get_all_document_files() -> list[tuple[int, int, Path]]:
 
     Returns:
         List of tuples (doc_id, version, path) for each document file.
+        Returns empty list if directory is inaccessible.
     """
-    documents_path = get_documents_path()
-    if not documents_path.exists():
+    try:
+        documents_path = get_documents_path()
+        if not documents_path.exists():
+            return []
+    except OSError:
+        # Directory existence check failed (network issue, permission, etc.)
         return []
 
     documents = []
-    for path in documents_path.glob("*.md"):
-        match = FILENAME_PATTERN.match(path.name)
-        if match:
-            doc_id = int(match.group(1))
-            version = int(match.group(2))
-            documents.append((doc_id, version, path))
+    try:
+        for path in documents_path.glob("*.md"):
+            try:
+                # Verify the path is a file (not a directory with .md extension)
+                if not path.is_file():
+                    continue
+                match = FILENAME_PATTERN.match(path.name)
+                if match:
+                    doc_id = int(match.group(1))
+                    version = int(match.group(2))
+                    documents.append((doc_id, version, path))
+            except OSError:
+                # Skip files that can't be accessed
+                continue
+    except OSError:
+        # Directory listing failed (network issue, permission, etc.)
+        return []
 
     return documents
 
@@ -389,13 +434,34 @@ def get_document_content(document_id: int, version: int | None = None) -> dict:
 
     Returns:
         On success: {"content": "<full markdown content>"}
-        On error: {"error": {"code": "NOT_FOUND", "message": "..."}}
+        On error: {"error": {"code": "NOT_FOUND"|"READ_ERROR", "message": "..."}}
     """
     try:
         path, _ = find_document_path(document_id, version)
         return {"content": path.read_text(encoding="utf-8")}
     except FileNotFoundError as e:
         return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
+    except UnicodeDecodeError as e:
+        return {
+            "error": ErrorResponse(
+                code="READ_ERROR",
+                message=f"File encoding error: {e.reason}"
+            ).model_dump()
+        }
+    except MemoryError:
+        return {
+            "error": ErrorResponse(
+                code="READ_ERROR",
+                message="File too large to read into memory"
+            ).model_dump()
+        }
+    except OSError as e:
+        return {
+            "error": ErrorResponse(
+                code="READ_ERROR",
+                message=format_os_error(e)
+            ).model_dump()
+        }
 
 
 @server.tool
@@ -408,7 +474,7 @@ def get_document_metadata(document_id: int, version: int | None = None) -> dict:
 
     Returns:
         On success: {"metadata": {id, version, title, type, author, reviewer, approver, date, status, chapters}}
-        On error: {"error": {"code": "NOT_FOUND"|"INVALID_FORMAT", "message": "..."}}
+        On error: {"error": {"code": "NOT_FOUND"|"INVALID_FORMAT"|"READ_ERROR", "message": "..."}}
     """
     try:
         path, resolved_version = find_document_path(document_id, version)
@@ -419,6 +485,13 @@ def get_document_metadata(document_id: int, version: int | None = None) -> dict:
     except (ValueError, KeyError) as e:
         return {
             "error": ErrorResponse(code="INVALID_FORMAT", message=str(e)).model_dump()
+        }
+    except OSError as e:
+        return {
+            "error": ErrorResponse(
+                code="READ_ERROR",
+                message=format_os_error(e)
+            ).model_dump()
         }
 
 
@@ -438,7 +511,7 @@ def diff_document_versions(
     Returns:
         On success: {"diff": "<unified diff text>"}
         On no changes: {"diff": "No changes between versions."}
-        On error: {"error": {"code": "NOT_FOUND", "message": "..."}}
+        On error: {"error": {"code": "NOT_FOUND"|"READ_ERROR", "message": "..."}}
     """
     try:
         old_path, _ = find_document_path(document_id, from_version)
@@ -464,6 +537,13 @@ def diff_document_versions(
         return {"diff": diff_text}
     except FileNotFoundError as e:
         return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
+    except OSError as e:
+        return {
+            "error": ErrorResponse(
+                code="READ_ERROR",
+                message=format_os_error(e)
+            ).model_dump()
+        }
 
 
 @server.tool
@@ -512,8 +592,8 @@ def list_document_versions(document_id: int) -> dict:
                     author=metadata.author,
                 )
             )
-        except (ValueError, KeyError):
-            continue  # Skip malformed documents
+        except (ValueError, KeyError, OSError):
+            continue  # Skip malformed or unreadable documents
 
     if not versions:
         return {

@@ -5,8 +5,11 @@
 [![codecov](https://codecov.io/gh/alex-pradas/folios/branch/main/graph/badge.svg)](https://codecov.io/gh/alex-pradas/folios)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://alex-pradas.github.io/folios/)
 
-A ligthweight Model Context Protocol (MCP) server for giving agents the tools to query your local library of documents.
+A lightweight Model Context Protocol (MCP) server for giving agents the tools to query your local library of documents.
+
+**[Documentation](https://alex-pradas.github.io/folios/)** | **[GitHub Repository](https://github.com/alex-pradas/folios)**
 
 ## What problem solves folios?
 
