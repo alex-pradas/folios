@@ -56,7 +56,19 @@ Applicable to all load-bearing structures.
 }
 ```
 
+**Read error (permission denied, network error, etc.):**
+
+```json
+{
+  "error": {
+    "code": "READ_ERROR",
+    "message": "[EACCES] Permission denied (file: /path/to/document.md)"
+  }
+}
+```
+
 ## Notes
 
 - Returns raw content even if the document has malformed metadata
 - Use `get_document_metadata` if you need structured metadata
+- Gracefully handles remote drive errors (network issues, permission changes)

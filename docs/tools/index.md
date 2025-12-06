@@ -2,6 +2,8 @@
 
 Folios provides 5 MCP tools for document management. Your AI assistant will use these tools automatically based on your requests.
 
+For auto-generated documentation from source code, see the [API Reference](../api-reference.md).
+
 ## Available Tools
 
 | Tool | Purpose |
@@ -47,3 +49,4 @@ All tools return structured errors when something goes wrong:
 |------|---------|
 | `NOT_FOUND` | Document or version doesn't exist |
 | `INVALID_FORMAT` | Document has malformed structure |
+| `READ_ERROR` | I/O error reading file (permission denied, network error, etc.) |
