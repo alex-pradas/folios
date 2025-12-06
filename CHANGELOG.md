@@ -5,9 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-12-06
+
+### Added
+
+- Automatic schema discovery from documents at startup
+- Smart field classification (enumerable ≤15 values vs free-text >15 values)
+- Filter hints in `list_documents` tool description showing available values
+
+### Changed
+
+- Server now uses factory pattern (`create_server()`) for better testability
+- Documents path passed explicitly instead of global state
+
+### Removed
+
+- **BREAKING**: `folios.toml` configuration file support removed
+- Manual field value configuration no longer needed
+
+### Performance
+
+- Schema discovery: ~15ms for 1000 documents (~70K docs/sec)
+
 ## [0.1.0] - 2025-12-06
 
 ### Added
+
 - Initial release (renamed from alexandria-mcp to folios)
 - Document storage with versioning support (`{id}_v{version}.md` naming)
 - YAML frontmatter parsing for metadata (author, reviewer, approver, status, type)
