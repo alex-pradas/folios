@@ -34,19 +34,6 @@ theme:
 
 plugins:
   - search
-  - mkdocstrings:
-      handlers:
-        python:
-          paths: [src]
-          options:
-            docstring_style: google
-            show_source: false
-            show_root_heading: true
-            show_root_full_path: false
-            heading_level: 2
-            members_order: source
-            show_signature_annotations: true
-            separate_signature: true
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -54,7 +41,8 @@ markdown_extensions:
       line_spans: __span
       pygments_lang_class: true
   - pymdownx.inlinehilite
-  - pymdownx.snippets
+  - pymdownx.snippets:
+      base_path: ["."]
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true

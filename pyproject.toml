@@ -40,7 +40,6 @@ packages = ["src/folios"]
 dev = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.7.0",
-    "mkdocstrings[python]>=1.0.0",
     "pytest>=8.0.0",
     "pytest-cov>=4.0.0",
 ]
