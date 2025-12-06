@@ -15,6 +15,7 @@ from typing import Any
 from importlib.metadata import version
 
 from fastmcp import FastMCP
+from fastmcp.resources import FunctionResource
 from fastmcp.utilities.logging import get_logger
 from pydantic import BaseModel
 
@@ -765,6 +766,45 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
         sorted_versions = sorted(versions, key=lambda v: v.version)
         logger.debug(f"Returned {len(sorted_versions)} versions in {elapsed_ms:.1f}ms")
         return {"versions": [v.model_dump() for v in sorted_versions]}
+
+    # =========================================================================
+    # Resources
+    # =========================================================================
+
+    def register_document_resources():
+        """Register each document version as a browsable resource."""
+        count = 0
+        for doc_id, doc_version, path in get_all_document_files(docs_path):
+            try:
+                metadata, _ = parse_document(path, doc_id, doc_version)
+                title = metadata.get("title", "Untitled")
+                author = metadata.get("author", "NA")
+                status = metadata.get("status", "NA")
+                doc_type = metadata.get("document_type", "NA")
+
+                # Capture path in closure for lazy reading
+                def make_reader(p: Path):
+                    def read() -> str:
+                        return p.read_text(encoding="utf-8")
+
+                    return read
+
+                server.add_resource(
+                    FunctionResource(
+                        uri=f"folios://documents/{doc_id}/v{doc_version}",
+                        name=f"{title} (v{doc_version})",
+                        description=f"Author: {author} | Status: {status} | Type: {doc_type}",
+                        mime_type="text/markdown",
+                        fn=make_reader(path),
+                    )
+                )
+                count += 1
+            except (ValueError, OSError):
+                continue  # Skip malformed documents
+
+        logger.info(f"Registered {count} document resources")
+
+    register_document_resources()
 
     return server
 
