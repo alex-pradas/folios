@@ -1,84 +1,99 @@
 # Configuration
 
-Folios works out of the box with zero configuration. Just point it at a folder of Markdown files and go. However, you can optionally configure field definitions to help AI agents better understand and query your documents.
+Folios works out of the box with zero configuration. Just point it at a folder of Markdown files and it automatically discovers field values from your documents.
 
-## Why Configure?
+## Automatic Schema Discovery
 
-When an AI agent uses Folios tools, it needs to know what values are valid for filtering. Without configuration:
+When Folios starts, it scans all documents in your folder and discovers the unique values for each frontmatter field. This information is then included in the MCP tool descriptions so AI agents know exactly what filter values are available.
 
-- The agent must guess or ask what document types exist
-- Filter suggestions may not match your actual data
-- The agent can't validate its queries against known values
+### How It Works
 
-With configuration:
+1. **At startup**, Folios reads all `.md` files matching the `{id}_v{version}.md` pattern
+2. **Extracts frontmatter** from each document
+3. **Collects unique values** for each field across all documents
+4. **Classifies fields** as enumerable (≤15 unique values) or free-text (>15 values)
+5. **Includes hints** in the `list_documents` tool description
 
-- Tool descriptions include valid values for each field
-- Agents can make more accurate queries immediately
-- Better autocomplete and validation in MCP-compatible clients
+### Example
 
-## Configuration File
+Given these documents:
 
-Create a `folios.toml` file in your documents folder:
+```markdown
+<!-- 100001_v1.md -->
+---
+status: "Draft"
+document_type: "Guideline"
+author: "Alice"
+---
 
-```
-documents/
-├── folios.toml          # Configuration file
-├── 100001_v1.md
-├── 100001_v2.md
-└── 100002_v1.md
-```
+<!-- 100002_v1.md -->
+---
+status: "Approved"
+document_type: "TRS"
+author: "Bob"
+---
 
-## Format
-
-Define allowed values for any frontmatter field:
-
-```toml
-# folios.toml
-
-[fields.status]
-values = ["Draft", "In Review", "Approved", "Withdrawn"]
-
-[fields.document_type]
-values = ["Design Practice", "Guideline", "Best Practice", "TRS", "DVP", "DVR"]
-
-[fields.department]
-values = ["Engineering", "Manufacturing", "HR", "Finance"]
+<!-- 100003_v1.md -->
+---
+status: "Draft"
+document_type: "Design Practice"
+author: "Alice"
+---
 ```
 
-## How It Works
+Folios will discover:
 
-When Folios starts, it reads `folios.toml` and includes the allowed values in the MCP tool descriptions. For example, the `list_documents` tool description will show:
+- **status**: Draft, Approved (2 values - enumerable)
+- **document_type**: Design Practice, Guideline, TRS (3 values - enumerable)
+- **author**: Alice, Bob (2 values - enumerable)
 
-```
-Filter by status (Draft|In Review|Approved|Withdrawn)
-Filter by document_type (Design Practice|Guideline|Best Practice|TRS|DVP|DVR)
-```
-
-This helps AI agents understand what values they can use when querying your document library.
-
-## Example
-
-Given this configuration:
-
-```toml
-[fields.status]
-values = ["Draft", "Approved"]
-
-[fields.document_type]
-values = ["Guideline", "TRS"]
-```
-
-An AI agent can confidently query:
+The `list_documents` tool description will include:
 
 ```
-list_documents(status="Approved", document_type="TRS")
+Discovered filters:
+  author: Alice, Bob
+  document_type: Design Practice, Guideline, TRS
+  status: Approved, Draft
 ```
 
-Without configuration, the agent would need to either guess these values or ask you first.
+### Field Classification
+
+Fields are classified based on the number of unique values:
+
+| Unique Values | Classification | Display |
+|---------------|----------------|---------|
+| ≤15 | Enumerable | All values listed |
+| >15 | Free-text | Shows count only |
+
+For example, if you have 50 different authors, the hints would show:
+
+```
+Discovered filters:
+  author: free text (50 unique values)
+  status: Approved, Draft
+```
+
+This prevents overwhelming the AI agent with too many options while still indicating the field is filterable.
+
+## Benefits
+
+- **Zero configuration required** - no separate config file to maintain
+- **Always up-to-date** - schema reflects actual document content
+- **No drift** - impossible for config to get out of sync with documents
+- **Automatic** - just add documents and the schema updates on restart
+
+## Performance
+
+Schema discovery is extremely fast:
+
+- ~15ms for 1000 documents
+- ~70,000 documents per second
+
+This happens once at server startup and has negligible impact on launch time.
 
 ## Notes
 
-- Configuration is entirely optional
-- Documents with values not in the config are still accepted
-- The config only affects tool descriptions, not validation
-- Changes to `folios.toml` require restarting the server
+- Discovery happens at server startup only
+- Adding new documents requires restarting the server to update the schema
+- Documents with parsing errors are skipped gracefully
+- Non-string values are converted to strings for filtering

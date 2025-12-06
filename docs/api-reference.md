@@ -30,3 +30,4 @@ These are the tools exposed by the Folios MCP server that AI assistants can call
     options:
       show_root_heading: true
       heading_level: 3
+

@@ -3,6 +3,8 @@
 import pytest
 from pathlib import Path
 
+from folios.server import create_server, discover_schema, build_filter_hints
+
 
 @pytest.fixture
 def documents_path(tmp_path: Path) -> Path:
@@ -30,6 +32,29 @@ def create_document(documents_path: Path):
         return filepath
 
     return _create
+
+
+@pytest.fixture
+def server_tools(documents_path: Path):
+    """Create a server instance and return its tools for testing.
+
+    Returns a namespace object with tool functions that can be called directly.
+    """
+    schema = discover_schema(documents_path)
+    hints = build_filter_hints(schema)
+    server = create_server(documents_path, hints)
+
+    # Extract the tool functions from the server's tool manager
+    class Tools:
+        pass
+
+    tools = Tools()
+
+    # Get registered tools from the server
+    for tool_name, tool in server._tool_manager._tools.items():
+        setattr(tools, tool_name, tool)
+
+    return tools
 
 
 @pytest.fixture
@@ -147,7 +172,7 @@ More text here.
 
 
 @pytest.fixture
-def sample_docs(set_documents_env: Path, create_document, valid_doc_content: str, valid_doc_v2_content: str):
+def sample_docs(documents_path: Path, create_document, valid_doc_content: str, valid_doc_v2_content: str):
     """Create a set of sample documents for testing."""
     # Document 1001 with versions 1 and 2
     create_document(1001, 1, valid_doc_content)
@@ -185,4 +210,4 @@ Third document by same author as doc 1001.
 """
     create_document(1003, 1, doc_1003)
 
-    return set_documents_env
+    return documents_path

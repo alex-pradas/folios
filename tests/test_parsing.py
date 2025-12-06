@@ -254,37 +254,37 @@ class TestParseDocument:
 class TestFindDocumentPath:
     """Tests for find_document_path function."""
 
-    def test_finds_specific_version(self, sample_docs: Path, create_document):
+    def test_finds_specific_version(self, sample_docs: Path, documents_path: Path):
         """Returns path and version for specific version."""
-        path, version = find_document_path(1001, 1)
+        path, version = find_document_path(documents_path, 1001, 1)
         assert path.exists()
         assert path.name == "1001_v1.md"
         assert version == 1
 
-    def test_finds_latest_version_when_none(self, sample_docs: Path):
+    def test_finds_latest_version_when_none(self, sample_docs: Path, documents_path: Path):
         """Returns highest version when version=None."""
-        path, version = find_document_path(1001, None)
+        path, version = find_document_path(documents_path, 1001, None)
         assert path.exists()
         assert path.name == "1001_v2.md"  # v2 is latest
         assert version == 2
 
-    def test_nonexistent_doc_raises_filenotfound(self, sample_docs: Path):
+    def test_nonexistent_doc_raises_filenotfound(self, sample_docs: Path, documents_path: Path):
         """Missing document raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError, match="Document 9999 not found"):
-            find_document_path(9999)
+            find_document_path(documents_path, 9999)
 
-    def test_nonexistent_version_raises_filenotfound(self, sample_docs: Path):
+    def test_nonexistent_version_raises_filenotfound(self, sample_docs: Path, documents_path: Path):
         """Missing version raises FileNotFoundError."""
         with pytest.raises(FileNotFoundError, match="version 99 not found"):
-            find_document_path(1001, 99)
+            find_document_path(documents_path, 1001, 99)
 
 
 class TestGetAllDocumentFiles:
     """Tests for get_all_document_files function."""
 
-    def test_returns_all_documents(self, sample_docs: Path):
+    def test_returns_all_documents(self, sample_docs: Path, documents_path: Path):
         """Returns all document files."""
-        files = get_all_document_files()
+        files = get_all_document_files(documents_path)
 
         # sample_docs creates: 1001_v1, 1001_v2, 1002_v1, 1003_v1
         assert len(files) == 4
@@ -292,18 +292,18 @@ class TestGetAllDocumentFiles:
         doc_ids = {f[0] for f in files}
         assert doc_ids == {1001, 1002, 1003}
 
-    def test_nonexistent_directory_returns_empty_list(self, tmp_path: Path, monkeypatch):
+    def test_nonexistent_directory_returns_empty_list(self, tmp_path: Path):
         """Missing documents directory returns empty list."""
-        monkeypatch.setenv("FOLIOS_PATH", str(tmp_path / "nonexistent"))
-        files = get_all_document_files()
+        nonexistent = tmp_path / "nonexistent"
+        files = get_all_document_files(nonexistent)
         assert files == []
 
-    def test_ignores_non_matching_filenames(self, set_documents_env: Path):
+    def test_ignores_non_matching_filenames(self, set_documents_env: Path, documents_path: Path):
         """Files not matching {id}_v{version}.md pattern ignored."""
         # Create non-matching files
-        (set_documents_env / "readme.md").write_text("# Readme")
-        (set_documents_env / "notes.txt").write_text("Notes")
-        (set_documents_env / "invalid_name.md").write_text("Invalid")
+        (documents_path / "readme.md").write_text("# Readme")
+        (documents_path / "notes.txt").write_text("Notes")
+        (documents_path / "invalid_name.md").write_text("Invalid")
 
-        files = get_all_document_files()
+        files = get_all_document_files(documents_path)
         assert files == []

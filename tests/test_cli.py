@@ -1,78 +1,53 @@
-"""Tests for CLI entry point and configuration."""
+"""Tests for CLI entry point."""
 
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
-import folios.server as server_module
-from folios.server import get_documents_path, main
-
-
-class TestGetDocumentsPath:
-    """Tests for get_documents_path configuration priority."""
-
-    def test_cli_path_takes_priority_over_env(self, tmp_path: Path, monkeypatch):
-        """CLI path should be returned when set, even if env var exists."""
-        cli_path = tmp_path / "cli_docs"
-        env_path = tmp_path / "env_docs"
-        cli_path.mkdir()
-        env_path.mkdir()
-
-        # Set both CLI and env var
-        monkeypatch.setattr(server_module, "_cli_folios_path", cli_path)
-        monkeypatch.setenv("FOLIOS_PATH", str(env_path))
-
-        result = get_documents_path()
-
-        assert result == cli_path
-
-    def test_raises_runtime_error_when_no_path_configured(self, monkeypatch):
-        """RuntimeError raised when neither CLI nor env var is set."""
-        monkeypatch.setattr(server_module, "_cli_folios_path", None)
-        monkeypatch.delenv("FOLIOS_PATH", raising=False)
-
-        with pytest.raises(RuntimeError, match="No documents path configured"):
-            get_documents_path()
+from folios.server import main
 
 
 class TestMain:
     """Tests for the CLI main() entry point."""
 
-    def test_main_with_folios_path_argument(self, tmp_path: Path, monkeypatch):
-        """main() should set _cli_folios_path when --folios-path is provided."""
-        docs_path = tmp_path / "docs"
-        docs_path.mkdir()
-
-        monkeypatch.setattr(server_module, "_cli_folios_path", None)
+    def test_main_with_folios_path_argument(self, documents_path: Path, monkeypatch):
+        """main() should create server with provided --folios-path."""
         monkeypatch.delenv("FOLIOS_PATH", raising=False)
-        monkeypatch.setattr(sys, "argv", ["folios", "--folios-path", str(docs_path)])
+        monkeypatch.setattr(sys, "argv", ["folios", "--folios-path", str(documents_path)])
 
-        # Mock server.run to prevent actual server startup
-        with patch.object(server_module.server, "run") as mock_run:
+        # Mock create_server and server.run to prevent actual server startup
+        with patch("folios.server.create_server") as mock_create:
+            mock_server = MagicMock()
+            mock_create.return_value = mock_server
+
             main()
 
-        assert server_module._cli_folios_path == docs_path
-        mock_run.assert_called_once_with(show_banner=False)
+            # Verify create_server was called with the right path
+            mock_create.assert_called_once()
+            call_args = mock_create.call_args
+            assert call_args[0][0] == documents_path  # First positional arg is docs_path
+            mock_server.run.assert_called_once_with(show_banner=False)
 
-    def test_main_with_env_var_only(self, tmp_path: Path, monkeypatch):
+    def test_main_with_env_var_only(self, documents_path: Path, monkeypatch):
         """main() should work with just FOLIOS_PATH env var."""
-        docs_path = tmp_path / "docs"
-        docs_path.mkdir()
-
-        monkeypatch.setattr(server_module, "_cli_folios_path", None)
-        monkeypatch.setenv("FOLIOS_PATH", str(docs_path))
+        monkeypatch.setenv("FOLIOS_PATH", str(documents_path))
         monkeypatch.setattr(sys, "argv", ["folios"])
 
-        with patch.object(server_module.server, "run") as mock_run:
+        with patch("folios.server.create_server") as mock_create:
+            mock_server = MagicMock()
+            mock_create.return_value = mock_server
+
             main()
 
-        mock_run.assert_called_once_with(show_banner=False)
+            mock_create.assert_called_once()
+            call_args = mock_create.call_args
+            assert call_args[0][0] == documents_path
+            mock_server.run.assert_called_once_with(show_banner=False)
 
     def test_main_exits_with_error_when_no_path(self, monkeypatch, capsys):
         """main() should exit with error when no path is configured."""
-        monkeypatch.setattr(server_module, "_cli_folios_path", None)
         monkeypatch.delenv("FOLIOS_PATH", raising=False)
         monkeypatch.setattr(sys, "argv", ["folios"])
 
@@ -85,3 +60,23 @@ class TestMain:
         assert "Error: No documents folder specified" in captured.err
         assert "--folios-path" in captured.err
         assert "FOLIOS_PATH" in captured.err
+
+    def test_cli_path_takes_priority_over_env(self, tmp_path: Path, monkeypatch):
+        """CLI path should be used when both CLI and env var are set."""
+        cli_path = tmp_path / "cli_docs"
+        env_path = tmp_path / "env_docs"
+        cli_path.mkdir()
+        env_path.mkdir()
+
+        monkeypatch.setenv("FOLIOS_PATH", str(env_path))
+        monkeypatch.setattr(sys, "argv", ["folios", "--folios-path", str(cli_path)])
+
+        with patch("folios.server.create_server") as mock_create:
+            mock_server = MagicMock()
+            mock_create.return_value = mock_server
+
+            main()
+
+            # Should use CLI path, not env path
+            call_args = mock_create.call_args
+            assert call_args[0][0] == cli_path

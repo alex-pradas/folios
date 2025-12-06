@@ -9,7 +9,6 @@ import difflib
 import os
 import re
 import sys
-import tomllib
 from pathlib import Path
 from typing import Any
 from importlib.metadata import version
@@ -17,12 +16,6 @@ from importlib.metadata import version
 from fastmcp import FastMCP
 from pydantic import BaseModel
 
-# Module-level variable for CLI-specified path (set by main())
-_cli_folios_path: Path | None = None
-
-# Module-level cache for configuration
-_config_cache: dict | None = None
-_config_loaded: bool = False
 
 # =============================================================================
 # Pydantic Models
@@ -74,6 +67,7 @@ def format_os_error(error: OSError) -> str:
     error_name = ""
     if error.errno is not None:
         import errno as errno_module
+
         error_name = errno_module.errorcode.get(error.errno, "")
 
     # Build informative message
@@ -90,79 +84,6 @@ def format_os_error(error: OSError) -> str:
     return " ".join(parts) if parts else "Unknown I/O error"
 
 
-# =============================================================================
-# Configuration
-# =============================================================================
-
-
-def get_documents_path() -> Path:
-    """Get the documents path from CLI flag or environment variable.
-
-    Priority:
-    1. --folios-path CLI flag
-    2. FOLIOS_PATH environment variable
-
-    Raises:
-        RuntimeError: If no path is configured.
-    """
-    if _cli_folios_path is not None:
-        return _cli_folios_path
-    env_path = os.environ.get("FOLIOS_PATH")
-    if env_path:
-        return Path(env_path)
-    raise RuntimeError("No documents path configured")
-
-
-def load_config() -> dict[str, Any] | None:
-    """Load configuration from folios.toml in the documents folder.
-
-    Returns:
-        Configuration dict if folios.toml exists, None otherwise.
-        Returns cached config on subsequent calls.
-    """
-    global _config_cache, _config_loaded
-
-    if _config_loaded:
-        return _config_cache
-
-    _config_loaded = True
-
-    try:
-        config_path = get_documents_path() / "folios.toml"
-        if config_path.exists():
-            with open(config_path, "rb") as f:
-                _config_cache = tomllib.load(f)
-            return _config_cache
-    except (RuntimeError, OSError):
-        # No documents path configured or can't read config
-        pass
-
-    return None
-
-
-def get_field_values(field_name: str) -> list[str] | None:
-    """Get allowed values for a field from configuration.
-
-    Args:
-        field_name: The field name to look up (e.g., 'status', 'document_type').
-
-    Returns:
-        List of allowed values if configured, None otherwise.
-    """
-    config = load_config()
-    if config and "fields" in config:
-        field_config = config["fields"].get(field_name, {})
-        return field_config.get("values")
-    return None
-
-
-def reset_config_cache() -> None:
-    """Reset the configuration cache. Useful for testing."""
-    global _config_cache, _config_loaded
-    _config_cache = None
-    _config_loaded = False
-
-
 # Pattern for parsing document filenames: {id}_v{version}.md
 FILENAME_PATTERN = re.compile(r"^(\d+)_v(\d+)\.md$")
 
@@ -172,8 +93,9 @@ TITLE_PATTERN = re.compile(r"^#\s+(.+)$", re.MULTILINE)
 # Pattern for parsing H2 headings (chapters)
 HEADING_PATTERN = re.compile(r"^##\s+(.+)$", re.MULTILINE)
 
+
 # =============================================================================
-# Storage Functions
+# Parsing Functions
 # =============================================================================
 
 
@@ -305,24 +227,31 @@ def parse_document(path: Path, doc_id: int, doc_version: int) -> tuple[dict[str,
     return metadata, body
 
 
-def get_all_document_files() -> list[tuple[int, int, Path]]:
+# =============================================================================
+# Storage Functions
+# =============================================================================
+
+
+def get_all_document_files(docs_path: Path) -> list[tuple[int, int, Path]]:
     """Scan documents directory and return all document files.
+
+    Args:
+        docs_path: Path to the documents directory.
 
     Returns:
         List of tuples (doc_id, version, path) for each document file.
         Returns empty list if directory is inaccessible.
     """
     try:
-        documents_path = get_documents_path()
-        if not documents_path.exists():
+        if not docs_path.exists():
             return []
     except OSError:
-        # Directory existence check failed (network issue, permission, etc.)
+        # Path check failed (network issue, permission, etc.)
         return []
 
     documents = []
     try:
-        for path in documents_path.glob("*.md"):
+        for path in docs_path.glob("*.md"):
             try:
                 # Verify the path is a file (not a directory with .md extension)
                 if not path.is_file():
@@ -330,8 +259,8 @@ def get_all_document_files() -> list[tuple[int, int, Path]]:
                 match = FILENAME_PATTERN.match(path.name)
                 if match:
                     doc_id = int(match.group(1))
-                    version = int(match.group(2))
-                    documents.append((doc_id, version, path))
+                    doc_version = int(match.group(2))
+                    documents.append((doc_id, doc_version, path))
             except OSError:
                 # Skip files that can't be accessed
                 continue
@@ -342,23 +271,27 @@ def get_all_document_files() -> list[tuple[int, int, Path]]:
     return documents
 
 
-def get_latest_version(doc_id: int) -> int | None:
+def get_latest_version(docs_path: Path, doc_id: int) -> int | None:
     """Find the highest version number for a document ID.
 
     Args:
+        docs_path: Path to the documents directory.
         doc_id: The document ID to search for.
 
     Returns:
         Highest version number, or None if document not found.
     """
-    versions = [v for d, v, _ in get_all_document_files() if d == doc_id]
+    versions = [v for d, v, _ in get_all_document_files(docs_path) if d == doc_id]
     return max(versions) if versions else None
 
 
-def find_document_path(doc_id: int, version: int | None = None) -> tuple[Path, int]:
+def find_document_path(
+    docs_path: Path, doc_id: int, version: int | None = None
+) -> tuple[Path, int]:
     """Resolve the file path for a document.
 
     Args:
+        docs_path: Path to the documents directory.
         doc_id: The document ID.
         version: Specific version, or None for latest.
 
@@ -369,12 +302,11 @@ def find_document_path(doc_id: int, version: int | None = None) -> tuple[Path, i
         FileNotFoundError: If document or version doesn't exist.
     """
     if version is None:
-        version = get_latest_version(doc_id)
+        version = get_latest_version(docs_path, doc_id)
         if version is None:
             raise FileNotFoundError(f"Document {doc_id} not found")
 
-    documents_path = get_documents_path()
-    path = documents_path / f"{doc_id}_v{version}.md"
+    path = docs_path / f"{doc_id}_v{version}.md"
     if not path.exists():
         raise FileNotFoundError(f"Document {doc_id} version {version} not found")
 
@@ -382,6 +314,7 @@ def find_document_path(doc_id: int, version: int | None = None) -> tuple[Path, i
 
 
 def scan_documents(
+    docs_path: Path,
     status: str | None = None,
     doc_type: str | None = None,
     author: str | None = None,
@@ -389,6 +322,7 @@ def scan_documents(
     """Scan and filter documents, returning summaries.
 
     Args:
+        docs_path: Path to the documents directory.
         status: Filter by document status.
         doc_type: Filter by document type.
         author: Filter by author name (case-insensitive substring match).
@@ -398,10 +332,10 @@ def scan_documents(
     """
     # Group files by document ID
     doc_versions: dict[int, list[tuple[int, Path]]] = {}
-    for doc_id, version, path in get_all_document_files():
+    for doc_id, doc_version, path in get_all_document_files(docs_path):
         if doc_id not in doc_versions:
             doc_versions[doc_id] = []
-        doc_versions[doc_id].append((version, path))
+        doc_versions[doc_id].append((doc_version, path))
 
     summaries = []
     for doc_id, versions in doc_versions.items():
@@ -440,285 +374,347 @@ def scan_documents(
 
     return summaries
 
+
 # =============================================================================
-# FastMCP Server
+# Schema Discovery
+# =============================================================================
+
+# Maximum unique values for a field to be considered enumerable
+MAX_ENUMERABLE_VALUES = 15
+
+
+def discover_schema(docs_path: Path) -> dict[str, set[str]]:
+    """Scan all documents and discover unique values for each frontmatter field.
+
+    Args:
+        docs_path: Path to the documents directory.
+
+    Returns:
+        Dictionary mapping field names to sets of unique values found.
+    """
+    field_values: dict[str, set[str]] = {}
+
+    for md_file in docs_path.glob("*.md"):
+        if not FILENAME_PATTERN.match(md_file.name):
+            continue
+        try:
+            content = md_file.read_text(encoding="utf-8")
+            frontmatter, _ = parse_frontmatter(content)
+            for key, value in frontmatter.items():
+                if key not in field_values:
+                    field_values[key] = set()
+                field_values[key].add(str(value))
+        except Exception:
+            continue
+
+    return field_values
+
+
+def build_filter_hints(schema: dict[str, set[str]]) -> str:
+    """Build description hints for the list_documents tool.
+
+    Args:
+        schema: Dictionary mapping field names to sets of unique values.
+
+    Returns:
+        Formatted string describing available filters for tool description.
+    """
+    if not schema:
+        return ""
+
+    lines = ["\n\nDiscovered filters:"]
+    for field, values in sorted(schema.items()):
+        if len(values) <= MAX_ENUMERABLE_VALUES:
+            # Enumerable field - list all values
+            lines.append(f"  {field}: {', '.join(sorted(values))}")
+        else:
+            # Free-form field - just show count
+            lines.append(f"  {field}: free text ({len(values)} unique values)")
+
+    return "\n".join(lines)
+
+
+# =============================================================================
+# Server Factory
 # =============================================================================
 
 __version__ = version("folios")
 
-server = FastMCP(
-    name="folios",
-    instructions="Retrieve and compare versioned engineering documents. "
-    "Documents have metadata (author, status, document_type) and chapters extracted from headings. "
-    "Set FOLIOS_PATH environment variable to configure the documents folder.",
-    version=__version__,
-)
 
-
-@server.tool
-def get_document_content(document_id: int, version: int | None = None) -> dict:
-    """Retrieve the full content of a document.
+def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
+    """Create and configure the MCP server with tools.
 
     Args:
-        document_id: Unique numeric identifier of the document.
-        version: Specific version number to retrieve. If not provided, returns the latest version.
+        docs_path: Path to the documents directory.
+        filter_hints: Dynamic description hints for list_documents.
 
     Returns:
-        On success: {"content": "<full markdown content>"}
-        On error: {"error": {"code": "NOT_FOUND"|"READ_ERROR", "message": "..."}}
-
-    Example:
-        Tool call:
-        ```json
-        {"tool": "get_document_content", "parameters": {"document_id": 123456}}
-        ```
-
-        Response:
-        ```json
-        {"content": "---\\ntype: Design Practice\\nauthor: J. Smith\\n..."}
-        ```
+        Configured FastMCP server instance.
     """
-    try:
-        path, _ = find_document_path(document_id, version)
-        return {"content": path.read_text(encoding="utf-8")}
-    except FileNotFoundError as e:
-        return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
-    except UnicodeDecodeError as e:
-        return {
-            "error": ErrorResponse(
-                code="READ_ERROR",
-                message=f"File encoding error: {e.reason}"
-            ).model_dump()
-        }
-    except MemoryError:
-        return {
-            "error": ErrorResponse(
-                code="READ_ERROR",
-                message="File too large to read into memory"
-            ).model_dump()
-        }
-    except OSError as e:
-        return {
-            "error": ErrorResponse(
-                code="READ_ERROR",
-                message=format_os_error(e)
-            ).model_dump()
-        }
+    server = FastMCP(
+        name="folios",
+        instructions="Retrieve and compare versioned engineering documents. "
+        "Documents have metadata (author, status, document_type) and chapters "
+        "extracted from headings.",
+        version=__version__,
+    )
 
+    @server.tool
+    def get_document_content(document_id: int, version: int | None = None) -> dict:
+        """Retrieve the full content of a document.
 
-@server.tool
-def get_document_metadata(document_id: int, version: int | None = None) -> dict:
-    """Retrieve metadata for a document including title, author, and chapters.
+        Args:
+            document_id: Unique numeric identifier of the document.
+            version: Specific version number to retrieve. If not provided, returns the latest version.
 
-    Args:
-        document_id: Unique numeric identifier of the document.
-        version: Specific version number. If not provided, returns metadata for the latest version.
+        Returns:
+            On success: {"content": "<full markdown content>"}
+            On error: {"error": {"code": "NOT_FOUND"|"READ_ERROR", "message": "..."}}
 
-    Returns:
-        On success: {"metadata": {id, version, title, author, date, chapters, ...}}
-            Core fields (id, version, title, author, date, chapters) are always present.
-            Author and date show "NA" if not in frontmatter.
-            Additional frontmatter fields are included dynamically.
-        On error: {"error": {"code": "NOT_FOUND"|"INVALID_FORMAT"|"READ_ERROR", "message": "..."}}
+        Example:
+            Tool call:
+            ```json
+            {"tool": "get_document_content", "parameters": {"document_id": 123456}}
+            ```
 
-    Example:
-        Tool call:
-        ```json
-        {"tool": "get_document_metadata", "parameters": {"document_id": 123456}}
-        ```
-
-        Response:
-        ```json
-        {
-          "metadata": {
-            "id": 123456,
-            "version": 2,
-            "title": "Stress Analysis Design Practice",
-            "author": "J. Smith",
-            "date": "2025-02-15",
-            "chapters": [{"title": "Scope"}, {"title": "Methodology"}],
-            "document_type": "Design Practice",
-            "status": "Approved",
-            "reviewer": "A. Johnson"
-          }
-        }
-        ```
-    """
-    try:
-        path, resolved_version = find_document_path(document_id, version)
-        metadata, _ = parse_document(path, document_id, resolved_version)
-        return {"metadata": metadata}
-    except FileNotFoundError as e:
-        return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
-    except (ValueError, KeyError) as e:
-        return {
-            "error": ErrorResponse(code="INVALID_FORMAT", message=str(e)).model_dump()
-        }
-    except OSError as e:
-        return {
-            "error": ErrorResponse(
-                code="READ_ERROR",
-                message=format_os_error(e)
-            ).model_dump()
-        }
-
-
-@server.tool
-def diff_document_versions(
-    document_id: int,
-    from_version: int,
-    to_version: int,
-) -> dict:
-    """Generate a unified diff between two versions of a document.
-
-    Args:
-        document_id: Unique numeric identifier of the document.
-        from_version: The older version number to compare from.
-        to_version: The newer version number to compare to.
-
-    Returns:
-        On success: {"diff": "<unified diff text>"}
-        On no changes: {"diff": "No changes between versions."}
-        On error: {"error": {"code": "NOT_FOUND"|"READ_ERROR", "message": "..."}}
-
-    Example:
-        Tool call:
-        ```json
-        {"tool": "diff_document_versions", "parameters": {"document_id": 123456, "from_version": 1, "to_version": 2}}
-        ```
-
-        Response:
-        ```json
-        {"diff": "--- 123456_v1.md\\n+++ 123456_v2.md\\n@@ -5,7 +5,7 @@\\n..."}
-        ```
-    """
-    try:
-        old_path, _ = find_document_path(document_id, from_version)
-        new_path, _ = find_document_path(document_id, to_version)
-
-        old_content = old_path.read_text(encoding="utf-8")
-        new_content = new_path.read_text(encoding="utf-8")
-
-        old_lines = old_content.splitlines(keepends=True)
-        new_lines = new_content.splitlines(keepends=True)
-
-        diff_lines = difflib.unified_diff(
-            old_lines,
-            new_lines,
-            fromfile=f"{document_id}_v{from_version}.md",
-            tofile=f"{document_id}_v{to_version}.md",
-        )
-        diff_text = "".join(diff_lines)
-
-        if not diff_text:
-            return {"diff": "No changes between versions."}
-
-        return {"diff": diff_text}
-    except FileNotFoundError as e:
-        return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
-    except OSError as e:
-        return {
-            "error": ErrorResponse(
-                code="READ_ERROR",
-                message=format_os_error(e)
-            ).model_dump()
-        }
-
-
-@server.tool
-def list_documents(
-    status: str | None = None,
-    document_type: str | None = None,
-    author: str | None = None,
-) -> list[DocumentSummary]:
-    """List all documents with optional filtering.
-
-    Args:
-        status: Filter by document status. Common values: Draft, In Review, Approved, Withdrawn.
-            Accepts any string value from document frontmatter.
-        document_type: Filter by document type. Common values: Design Practice, Guideline, TRS.
-            Accepts any string value from document frontmatter.
-        author: Filter by author name (case-insensitive substring match).
-
-    Returns:
-        List of documents with {id, title, latest_version, status, document_type} for each.
-        Returns empty list if no documents match the filters.
-        Fields show "NA" if not present in document frontmatter.
-
-    Note:
-        Valid values for status and document_type can be configured in folios.toml.
-
-    Example:
-        Tool call:
-        ```json
-        {"tool": "list_documents", "parameters": {"status": "Approved", "document_type": "Design Practice"}}
-        ```
-
-        Response:
-        ```json
-        [
-          {"id": 123456, "title": "Stress Analysis", "latest_version": 2, "status": "Approved", "document_type": "Design Practice"},
-          {"id": 789012, "title": "Fatigue Analysis", "latest_version": 1, "status": "Approved", "document_type": "Design Practice"}
-        ]
-        ```
-    """
-    return scan_documents(status=status, doc_type=document_type, author=author)
-
-
-@server.tool
-def list_document_versions(document_id: int) -> dict:
-    """List all available versions of a specific document.
-
-    Args:
-        document_id: Unique numeric identifier of the document.
-
-    Returns:
-        On success: {"versions": [{version, date, status, author}, ...]}
-        On error: {"error": {"code": "NOT_FOUND", "message": "..."}}
-
-    Example:
-        Tool call:
-        ```json
-        {"tool": "list_document_versions", "parameters": {"document_id": 123456}}
-        ```
-
-        Response:
-        ```json
-        {
-          "versions": [
-            {"version": 1, "date": "2025-01-10", "status": "Approved", "author": "J. Smith"},
-            {"version": 2, "date": "2025-02-15", "status": "Approved", "author": "J. Smith"}
-          ]
-        }
-        ```
-    """
-    versions = []
-    for doc_id, doc_version, path in get_all_document_files():
-        if doc_id != document_id:
-            continue
-
+            Response:
+            ```json
+            {"content": "---\\ntype: Design Practice\\nauthor: J. Smith\\n..."}
+            ```
+        """
         try:
-            metadata, _ = parse_document(path, doc_id, doc_version)
-            versions.append(
-                VersionInfo(
-                    version=doc_version,
-                    date=metadata.get("date", "NA"),
-                    status=metadata.get("status", "NA"),
-                    author=metadata.get("author", "NA"),
-                )
+            path, _ = find_document_path(docs_path, document_id, version)
+            return {"content": path.read_text(encoding="utf-8")}
+        except FileNotFoundError as e:
+            return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
+        except UnicodeDecodeError as e:
+            return {
+                "error": ErrorResponse(
+                    code="READ_ERROR", message=f"File encoding error: {e.reason}"
+                ).model_dump()
+            }
+        except MemoryError:
+            return {
+                "error": ErrorResponse(
+                    code="READ_ERROR", message="File too large to read into memory"
+                ).model_dump()
+            }
+        except OSError as e:
+            return {
+                "error": ErrorResponse(
+                    code="READ_ERROR", message=format_os_error(e)
+                ).model_dump()
+            }
+
+    @server.tool
+    def get_document_metadata(document_id: int, version: int | None = None) -> dict:
+        """Retrieve metadata for a document including title, author, and chapters.
+
+        Args:
+            document_id: Unique numeric identifier of the document.
+            version: Specific version number. If not provided, returns metadata for the latest version.
+
+        Returns:
+            On success: {"metadata": {id, version, title, author, date, chapters, ...}}
+                Core fields (id, version, title, author, date, chapters) are always present.
+                Author and date show "NA" if not in frontmatter.
+                Additional frontmatter fields are included dynamically.
+            On error: {"error": {"code": "NOT_FOUND"|"INVALID_FORMAT"|"READ_ERROR", "message": "..."}}
+
+        Example:
+            Tool call:
+            ```json
+            {"tool": "get_document_metadata", "parameters": {"document_id": 123456}}
+            ```
+
+            Response:
+            ```json
+            {
+              "metadata": {
+                "id": 123456,
+                "version": 2,
+                "title": "Stress Analysis Design Practice",
+                "author": "J. Smith",
+                "date": "2025-02-15",
+                "chapters": [{"title": "Scope"}, {"title": "Methodology"}],
+                "document_type": "Design Practice",
+                "status": "Approved",
+                "reviewer": "A. Johnson"
+              }
+            }
+            ```
+        """
+        try:
+            path, resolved_version = find_document_path(docs_path, document_id, version)
+            metadata, _ = parse_document(path, document_id, resolved_version)
+            return {"metadata": metadata}
+        except FileNotFoundError as e:
+            return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
+        except (ValueError, KeyError) as e:
+            return {
+                "error": ErrorResponse(code="INVALID_FORMAT", message=str(e)).model_dump()
+            }
+        except OSError as e:
+            return {
+                "error": ErrorResponse(
+                    code="READ_ERROR", message=format_os_error(e)
+                ).model_dump()
+            }
+
+    @server.tool
+    def diff_document_versions(
+        document_id: int,
+        from_version: int,
+        to_version: int,
+    ) -> dict:
+        """Generate a unified diff between two versions of a document.
+
+        Args:
+            document_id: Unique numeric identifier of the document.
+            from_version: The older version number to compare from.
+            to_version: The newer version number to compare to.
+
+        Returns:
+            On success: {"diff": "<unified diff text>"}
+            On no changes: {"diff": "No changes between versions."}
+            On error: {"error": {"code": "NOT_FOUND"|"READ_ERROR", "message": "..."}}
+
+        Example:
+            Tool call:
+            ```json
+            {"tool": "diff_document_versions", "parameters": {"document_id": 123456, "from_version": 1, "to_version": 2}}
+            ```
+
+            Response:
+            ```json
+            {"diff": "--- 123456_v1.md\\n+++ 123456_v2.md\\n@@ -5,7 +5,7 @@\\n..."}
+            ```
+        """
+        try:
+            old_path, _ = find_document_path(docs_path, document_id, from_version)
+            new_path, _ = find_document_path(docs_path, document_id, to_version)
+
+            old_content = old_path.read_text(encoding="utf-8")
+            new_content = new_path.read_text(encoding="utf-8")
+
+            old_lines = old_content.splitlines(keepends=True)
+            new_lines = new_content.splitlines(keepends=True)
+
+            diff_lines = difflib.unified_diff(
+                old_lines,
+                new_lines,
+                fromfile=f"{document_id}_v{from_version}.md",
+                tofile=f"{document_id}_v{to_version}.md",
             )
-        except (ValueError, KeyError, OSError):
-            continue  # Skip malformed or unreadable documents
+            diff_text = "".join(diff_lines)
 
-    if not versions:
-        return {
-            "error": ErrorResponse(
-                code="NOT_FOUND", message=f"Document {document_id} not found"
-            ).model_dump()
-        }
+            if not diff_text:
+                return {"diff": "No changes between versions."}
 
-    sorted_versions = sorted(versions, key=lambda v: v.version)
-    return {"versions": [v.model_dump() for v in sorted_versions]}
+            return {"diff": diff_text}
+        except FileNotFoundError as e:
+            return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
+        except OSError as e:
+            return {
+                "error": ErrorResponse(
+                    code="READ_ERROR", message=format_os_error(e)
+                ).model_dump()
+            }
+
+    @server.tool(
+        description="List all documents with optional filtering." + filter_hints
+    )
+    def list_documents(
+        status: str | None = None,
+        document_type: str | None = None,
+        author: str | None = None,
+    ) -> list[DocumentSummary]:
+        """List all documents with optional filtering.
+
+        Args:
+            status: Filter by document status.
+            document_type: Filter by document type.
+            author: Filter by author name (case-insensitive substring match).
+
+        Returns:
+            List of documents with {id, title, latest_version, status, document_type} for each.
+            Returns empty list if no documents match the filters.
+            Fields show "NA" if not present in document frontmatter.
+
+        Example:
+            Tool call:
+            ```json
+            {"tool": "list_documents", "parameters": {"status": "Approved", "document_type": "Design Practice"}}
+            ```
+
+            Response:
+            ```json
+            [
+              {"id": 123456, "title": "Stress Analysis", "latest_version": 2, "status": "Approved", "document_type": "Design Practice"},
+              {"id": 789012, "title": "Fatigue Analysis", "latest_version": 1, "status": "Approved", "document_type": "Design Practice"}
+            ]
+            ```
+        """
+        return scan_documents(
+            docs_path, status=status, doc_type=document_type, author=author
+        )
+
+    @server.tool
+    def list_document_versions(document_id: int) -> dict:
+        """List all available versions of a specific document.
+
+        Args:
+            document_id: Unique numeric identifier of the document.
+
+        Returns:
+            On success: {"versions": [{version, date, status, author}, ...]}
+            On error: {"error": {"code": "NOT_FOUND", "message": "..."}}
+
+        Example:
+            Tool call:
+            ```json
+            {"tool": "list_document_versions", "parameters": {"document_id": 123456}}
+            ```
+
+            Response:
+            ```json
+            {
+              "versions": [
+                {"version": 1, "date": "2025-01-10", "status": "Approved", "author": "J. Smith"},
+                {"version": 2, "date": "2025-02-15", "status": "Approved", "author": "J. Smith"}
+              ]
+            }
+            ```
+        """
+        versions = []
+        for doc_id, doc_version, path in get_all_document_files(docs_path):
+            if doc_id != document_id:
+                continue
+
+            try:
+                metadata, _ = parse_document(path, doc_id, doc_version)
+                versions.append(
+                    VersionInfo(
+                        version=doc_version,
+                        date=metadata.get("date", "NA"),
+                        status=metadata.get("status", "NA"),
+                        author=metadata.get("author", "NA"),
+                    )
+                )
+            except (ValueError, KeyError, OSError):
+                continue  # Skip malformed or unreadable documents
+
+        if not versions:
+            return {
+                "error": ErrorResponse(
+                    code="NOT_FOUND", message=f"Document {document_id} not found"
+                ).model_dump()
+            }
+
+        sorted_versions = sorted(versions, key=lambda v: v.version)
+        return {"versions": [v.model_dump() for v in sorted_versions]}
+
+    return server
 
 
 # =============================================================================
@@ -728,8 +724,6 @@ def list_document_versions(document_id: int) -> dict:
 
 def main():
     """Run the Folios MCP server."""
-    global _cli_folios_path
-
     parser = argparse.ArgumentParser(description="Folios MCP Server")
     parser.add_argument(
         "--folios-path",
@@ -738,10 +732,14 @@ def main():
     )
     args = parser.parse_args()
 
-    # Determine path: CLI flag > env var > error
-    if args.folios_path:
-        _cli_folios_path = args.folios_path
-    elif not os.environ.get("FOLIOS_PATH"):
+    # Resolve documents path: CLI flag > env var > error
+    docs_path = args.folios_path
+    if docs_path is None:
+        env_path = os.environ.get("FOLIOS_PATH")
+        if env_path:
+            docs_path = Path(env_path)
+
+    if docs_path is None:
         print(
             "Error: No documents folder specified.\n\n"
             "Please provide the path to your documents folder using either:\n"
@@ -751,6 +749,12 @@ def main():
         )
         sys.exit(1)
 
+    # Discover schema from existing documents
+    schema = discover_schema(docs_path)
+    filter_hints = build_filter_hints(schema)
+
+    # Create and run server
+    server = create_server(docs_path, filter_hints)
     server.run(show_banner=False)
 
 

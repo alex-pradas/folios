@@ -1,9 +1,0 @@
-# Folios Configuration
-# This file defines allowed values for document metadata fields.
-# Agents can use these values to understand valid options for filtering.
-
-[fields.status]
-values = ["Draft", "In Review", "Approved", "Withdrawn"]
-
-[fields.document_type]
-values = ["Design Practice", "Guideline", "Best Practice", "TRS", "DVP", "DVR"]
