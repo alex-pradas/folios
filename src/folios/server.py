@@ -24,14 +24,17 @@ _cli_folios_path: Path | None = None
 # =============================================================================
 
 DocumentStatus = Literal["Draft", "In Review", "Approved", "Withdrawn"]
+"""Valid document statuses: Draft, In Review, Approved, Withdrawn."""
+
 DocumentType = Literal[
     "Design Practice",
     "Guideline",
     "Best Practice",
-    "TRS",  # Technical Requirement Specification
-    "DVP",  # Design Verification Plan
-    "DVR",  # Detail Verification Review
+    "TRS",
+    "DVP",
+    "DVR",
 ]
+"""Valid document types: Design Practice, Guideline, Best Practice, TRS, DVP, DVR."""
 
 # =============================================================================
 # Pydantic Models
@@ -435,6 +438,17 @@ def get_document_content(document_id: int, version: int | None = None) -> dict:
     Returns:
         On success: {"content": "<full markdown content>"}
         On error: {"error": {"code": "NOT_FOUND"|"READ_ERROR", "message": "..."}}
+
+    Example:
+        Tool call:
+        ```json
+        {"tool": "get_document_content", "parameters": {"document_id": 123456}}
+        ```
+
+        Response:
+        ```json
+        {"content": "---\\ntype: Design Practice\\nauthor: J. Smith\\n..."}
+        ```
     """
     try:
         path, _ = find_document_path(document_id, version)
@@ -475,6 +489,30 @@ def get_document_metadata(document_id: int, version: int | None = None) -> dict:
     Returns:
         On success: {"metadata": {id, version, title, type, author, reviewer, approver, date, status, chapters}}
         On error: {"error": {"code": "NOT_FOUND"|"INVALID_FORMAT"|"READ_ERROR", "message": "..."}}
+
+    Example:
+        Tool call:
+        ```json
+        {"tool": "get_document_metadata", "parameters": {"document_id": 123456}}
+        ```
+
+        Response:
+        ```json
+        {
+          "metadata": {
+            "id": 123456,
+            "version": 2,
+            "title": "Stress Analysis Design Practice",
+            "type": "Design Practice",
+            "author": "J. Smith",
+            "reviewer": "A. Johnson",
+            "approver": "M. Williams",
+            "date": "2025-02-15",
+            "status": "Approved",
+            "chapters": [{"title": "Scope"}, {"title": "Methodology"}]
+          }
+        }
+        ```
     """
     try:
         path, resolved_version = find_document_path(document_id, version)
@@ -512,6 +550,17 @@ def diff_document_versions(
         On success: {"diff": "<unified diff text>"}
         On no changes: {"diff": "No changes between versions."}
         On error: {"error": {"code": "NOT_FOUND"|"READ_ERROR", "message": "..."}}
+
+    Example:
+        Tool call:
+        ```json
+        {"tool": "diff_document_versions", "parameters": {"document_id": 123456, "from_version": 1, "to_version": 2}}
+        ```
+
+        Response:
+        ```json
+        {"diff": "--- 123456_v1.md\\n+++ 123456_v2.md\\n@@ -5,7 +5,7 @@\\n..."}
+        ```
     """
     try:
         old_path, _ = find_document_path(document_id, from_version)
@@ -562,6 +611,20 @@ def list_documents(
     Returns:
         List of documents with {id, title, latest_version, status, type} for each.
         Returns empty list if no documents match the filters.
+
+    Example:
+        Tool call:
+        ```json
+        {"tool": "list_documents", "parameters": {"status": "Approved", "document_type": "Design Practice"}}
+        ```
+
+        Response:
+        ```json
+        [
+          {"id": 123456, "title": "Stress Analysis", "latest_version": 2, "status": "Approved", "type": "Design Practice"},
+          {"id": 789012, "title": "Fatigue Analysis", "latest_version": 1, "status": "Approved", "type": "Design Practice"}
+        ]
+        ```
     """
     return scan_documents(status=status, doc_type=document_type, author=author)
 
@@ -576,6 +639,22 @@ def list_document_versions(document_id: int) -> dict:
     Returns:
         On success: {"versions": [{version, date, status, author}, ...]}
         On error: {"error": {"code": "NOT_FOUND", "message": "..."}}
+
+    Example:
+        Tool call:
+        ```json
+        {"tool": "list_document_versions", "parameters": {"document_id": 123456}}
+        ```
+
+        Response:
+        ```json
+        {
+          "versions": [
+            {"version": 1, "date": "2025-01-10", "status": "Approved", "author": "J. Smith"},
+            {"version": 2, "date": "2025-02-15", "status": "Approved", "author": "J. Smith"}
+          ]
+        }
+        ```
     """
     versions = []
     for doc_id, version, path in get_all_document_files():

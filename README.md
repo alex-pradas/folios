@@ -9,7 +9,7 @@
 
 A lightweight Model Context Protocol (MCP) server for giving agents the tools to query your local library of documents.
 
-**[Documentation](https://alex-pradas.github.io/folios/)** | **[GitHub Repository](https://github.com/alex-pradas/folios)**
+**[Documentation](https://alex-pradas.github.io/folios/)**
 
 ## What problem solves folios?
 
@@ -24,13 +24,13 @@ If you are developing agentic workflows, in order to mock the functionality to g
 - **Minimal Maintenance** - No complex setup, no database, no indexing, all within the document.
 - **Versioned Documents** - Store multiple versions with simple `{id}_v{version}.md` naming
 
-## Quick Setup
+## One-liner to install, run and configure
 
 ```bash
 uvx folios --folios-path /path/to/your/documents
 ```
 
-## Quick Start
+## Quick guide to get started
 
 ### 1. Create your documents folder
 

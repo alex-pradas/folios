@@ -66,13 +66,5 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Tools:
-      - Overview: tools/index.md
-      - get_document_content: tools/get-document.md
-      - get_document_metadata: tools/get-metadata.md
-      - list_documents: tools/list-documents.md
-      - list_document_versions: tools/list-versions.md
-      - diff_document_versions: tools/compare.md
   - API Reference: api-reference.md
   - Document Format: document-format.md
-  - Configuration: configuration.md

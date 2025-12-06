@@ -60,25 +60,16 @@ More content...
 
 ## Valid Values
 
-### Types
+::: folios.server.DocumentType
+    options:
+      show_root_heading: false
+      heading_level: 4
 
-| Type | Description |
-|------|-------------|
-| `Design Practice` | Standard design methodology |
-| `Guideline` | Recommended approaches |
-| `Best Practice` | Industry best practices |
-| `TRS` | Technical Requirement Specification |
-| `DVP` | Design Verification Plan |
-| `DVR` | Detail Verification Review |
 
-### Statuses
-
-| Status | Description |
-|--------|-------------|
-| `Draft` | Work in progress |
-| `In Review` | Under review |
-| `Approved` | Approved for use |
-| `Withdrawn` | No longer valid |
+::: folios.server.DocumentStatus
+    options:
+      show_root_heading: false
+      heading_level: 4
 
 ## Versioning
 
