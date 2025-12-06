@@ -1,6 +1,6 @@
 [project]
 name = "folios"
-version = "0.2.0"
+version = "0.3.0"
 description = "MCP server for versioned document retrieval, metadata access, and diff capabilities"
 readme = "README.md"
 requires-python = ">=3.12"

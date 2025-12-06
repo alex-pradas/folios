@@ -91,6 +91,63 @@ Schema discovery is extremely fast:
 
 This happens once at server startup and has negligible impact on launch time.
 
+## Logging
+
+Folios logs server activity to stderr, useful for debugging and monitoring performance.
+
+### Example Output
+
+```
+[12/06/25 21:46:48] INFO     Folios v0.2.0 starting
+                    INFO     Documents path: /path/to/docs
+                    INFO     Scanned 42 documents
+                    INFO     Schema discovery: 5 fields in 234.5ms
+                    INFO     Server ready
+
+                    INFO     list_documents(status=None, document_type=None, author=None)
+                    DEBUG    Returned 42 documents in 45.2ms
+```
+
+### Log Levels
+
+Control verbosity via the `FASTMCP_LOG_LEVEL` environment variable:
+
+| Level | Shows |
+|-------|-------|
+| `DEBUG` | Per-file parsing times, response sizes, detailed timing |
+| `INFO` (default) | Tool invocations, startup info, document counts |
+| `WARNING` | Warnings and errors only |
+| `ERROR` | Errors only |
+
+### Usage
+
+```bash
+# Verbose output (shows per-file parsing)
+FASTMCP_LOG_LEVEL=DEBUG uvx folios --folios-path /path/to/docs
+
+# Quiet mode
+FASTMCP_LOG_LEVEL=WARNING uvx folios --folios-path /path/to/docs
+```
+
+In Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "folios": {
+      "command": "uvx",
+      "args": ["folios", "--folios-path", "/path/to/documents"],
+      "env": {
+        "FASTMCP_LOG_LEVEL": "DEBUG"
+      }
+    }
+  }
+}
+```
+
+!!! note
+    Logs go to stderr, so they won't interfere with the MCP protocol on stdout. In Claude Desktop, logs are captured but not displayed to the user.
+
 ## Notes
 
 - Discovery happens at server startup only

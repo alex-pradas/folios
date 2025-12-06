@@ -9,12 +9,16 @@ import difflib
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any
 from importlib.metadata import version
 
 from fastmcp import FastMCP
+from fastmcp.utilities.logging import get_logger
 from pydantic import BaseModel
+
+logger = get_logger("folios")
 
 
 # =============================================================================
@@ -181,7 +185,9 @@ def parse_chapters(content: str) -> list[Chapter]:
     return chapters
 
 
-def parse_document(path: Path, doc_id: int, doc_version: int) -> tuple[dict[str, Any], str]:
+def parse_document(
+    path: Path, doc_id: int, doc_version: int
+) -> tuple[dict[str, Any], str]:
     """Parse a document file into metadata and content.
 
     The id and version are derived from the filename, and title is extracted
@@ -393,13 +399,20 @@ def discover_schema(docs_path: Path) -> dict[str, set[str]]:
         Dictionary mapping field names to sets of unique values found.
     """
     field_values: dict[str, set[str]] = {}
+    file_count = 0
 
     for md_file in docs_path.glob("*.md"):
         if not FILENAME_PATTERN.match(md_file.name):
             continue
         try:
+            start = time.perf_counter()
             content = md_file.read_text(encoding="utf-8")
             frontmatter, _ = parse_frontmatter(content)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            logger.debug(
+                f"Parsed {md_file.name}: {len(frontmatter)} fields in {elapsed_ms:.1f}ms"
+            )
+            file_count += 1
             for key, value in frontmatter.items():
                 if key not in field_values:
                     field_values[key] = set()
@@ -407,6 +420,7 @@ def discover_schema(docs_path: Path) -> dict[str, set[str]]:
         except Exception:
             continue
 
+    logger.info(f"Scanned {file_count} documents")
     return field_values
 
 
@@ -482,11 +496,20 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             {"content": "---\\ntype: Design Practice\\nauthor: J. Smith\\n..."}
             ```
         """
+        logger.info(
+            f"get_document_content(document_id={document_id}, version={version})"
+        )
+        start = time.perf_counter()
         try:
             path, _ = find_document_path(docs_path, document_id, version)
-            return {"content": path.read_text(encoding="utf-8")}
+            content = path.read_text(encoding="utf-8")
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            logger.debug(f"Returned {len(content)}B in {elapsed_ms:.1f}ms")
+            return {"content": content}
         except FileNotFoundError as e:
-            return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
+            return {
+                "error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()
+            }
         except UnicodeDecodeError as e:
             return {
                 "error": ErrorResponse(
@@ -544,15 +567,25 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             }
             ```
         """
+        logger.info(
+            f"get_document_metadata(document_id={document_id}, version={version})"
+        )
+        start = time.perf_counter()
         try:
             path, resolved_version = find_document_path(docs_path, document_id, version)
             metadata, _ = parse_document(path, document_id, resolved_version)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            logger.debug(f"Returned metadata in {elapsed_ms:.1f}ms")
             return {"metadata": metadata}
         except FileNotFoundError as e:
-            return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
+            return {
+                "error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()
+            }
         except (ValueError, KeyError) as e:
             return {
-                "error": ErrorResponse(code="INVALID_FORMAT", message=str(e)).model_dump()
+                "error": ErrorResponse(
+                    code="INVALID_FORMAT", message=str(e)
+                ).model_dump()
             }
         except OSError as e:
             return {
@@ -590,6 +623,10 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             {"diff": "--- 123456_v1.md\\n+++ 123456_v2.md\\n@@ -5,7 +5,7 @@\\n..."}
             ```
         """
+        logger.info(
+            f"diff_document_versions(document_id={document_id}, from_version={from_version}, to_version={to_version})"
+        )
+        start = time.perf_counter()
         try:
             old_path, _ = find_document_path(docs_path, document_id, from_version)
             new_path, _ = find_document_path(docs_path, document_id, to_version)
@@ -607,13 +644,17 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
                 tofile=f"{document_id}_v{to_version}.md",
             )
             diff_text = "".join(diff_lines)
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            logger.debug(f"Generated diff in {elapsed_ms:.1f}ms")
 
             if not diff_text:
                 return {"diff": "No changes between versions."}
 
             return {"diff": diff_text}
         except FileNotFoundError as e:
-            return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
+            return {
+                "error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()
+            }
         except OSError as e:
             return {
                 "error": ErrorResponse(
@@ -655,9 +696,16 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             ]
             ```
         """
-        return scan_documents(
+        logger.info(
+            f"list_documents(status={status}, document_type={document_type}, author={author})"
+        )
+        start = time.perf_counter()
+        results = scan_documents(
             docs_path, status=status, doc_type=document_type, author=author
         )
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        logger.debug(f"Returned {len(results)} documents in {elapsed_ms:.1f}ms")
+        return results
 
     @server.tool
     def list_document_versions(document_id: int) -> dict:
@@ -686,6 +734,8 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             }
             ```
         """
+        logger.info(f"list_document_versions(document_id={document_id})")
+        start = time.perf_counter()
         versions = []
         for doc_id, doc_version, path in get_all_document_files(docs_path):
             if doc_id != document_id:
@@ -704,6 +754,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             except (ValueError, KeyError, OSError):
                 continue  # Skip malformed or unreadable documents
 
+        elapsed_ms = (time.perf_counter() - start) * 1000
         if not versions:
             return {
                 "error": ErrorResponse(
@@ -712,6 +763,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             }
 
         sorted_versions = sorted(versions, key=lambda v: v.version)
+        logger.debug(f"Returned {len(sorted_versions)} versions in {elapsed_ms:.1f}ms")
         return {"versions": [v.model_dump() for v in sorted_versions]}
 
     return server
@@ -749,12 +801,19 @@ def main():
         )
         sys.exit(1)
 
+    logger.info(f"Folios v{__version__} starting")
+    logger.info(f"Documents path: {docs_path}")
+
     # Discover schema from existing documents
+    start = time.perf_counter()
     schema = discover_schema(docs_path)
+    elapsed_ms = (time.perf_counter() - start) * 1000
     filter_hints = build_filter_hints(schema)
+    logger.info(f"Schema discovery: {len(schema)} fields in {elapsed_ms:.1f}ms")
 
     # Create and run server
     server = create_server(docs_path, filter_hints)
+    logger.info("Server ready")
     server.run(show_banner=False)
 
 
