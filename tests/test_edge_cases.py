@@ -2,6 +2,7 @@
 
 import pytest
 from pathlib import Path
+from unittest.mock import patch
 
 from folios.server import (
     get_document_content,
@@ -9,6 +10,7 @@ from folios.server import (
     list_documents,
     list_document_versions,
     diff_document_versions,
+    get_all_document_files,
 )
 
 
@@ -302,3 +304,29 @@ class TestDiffEdgeCases:
         assert "diff" in result
         # Diff should show changes, just in reverse direction
         assert "---" in result["diff"]
+
+
+class TestFileScanningErrors:
+    """Tests for error handling during file system scanning."""
+
+    def test_oserror_during_is_file_check_skips_file(
+        self, set_documents_env: Path, create_document, valid_doc_content: str
+    ):
+        """OSError during is_file() check should skip that file gracefully."""
+        create_document(8001, 1, valid_doc_content)
+        create_document(8002, 1, valid_doc_content)
+
+        original_is_file = Path.is_file
+
+        def mock_is_file(self):
+            if "8001" in str(self):
+                raise OSError("Simulated I/O error")
+            return original_is_file(self)
+
+        with patch.object(Path, "is_file", mock_is_file):
+            result = get_all_document_files()
+
+        # Only 8002 should be returned, 8001 skipped due to OSError
+        doc_ids = [doc_id for doc_id, _, _ in result]
+        assert 8002 in doc_ids
+        assert 8001 not in doc_ids

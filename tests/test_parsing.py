@@ -79,6 +79,57 @@ Body content.
         assert frontmatter == {}
         assert "Body content" in body
 
+    def test_frontmatter_with_comments_skips_comment_lines(self):
+        """Comment lines in frontmatter should be skipped."""
+        content = """---
+# This is a comment
+type: "Guideline"
+# Another comment
+author: "Test"
+---
+
+# Title
+"""
+        frontmatter, body = parse_frontmatter(content)
+
+        assert frontmatter["type"] == "Guideline"
+        assert frontmatter["author"] == "Test"
+        assert len(frontmatter) == 2  # Only type and author, no comments
+
+    def test_frontmatter_with_lines_missing_colon_skips_them(self):
+        """Lines without colons in frontmatter should be skipped."""
+        content = """---
+type: "Guideline"
+this line has no colon
+author: "Test"
+another malformed line
+---
+
+# Title
+"""
+        frontmatter, body = parse_frontmatter(content)
+
+        assert frontmatter["type"] == "Guideline"
+        assert frontmatter["author"] == "Test"
+        assert len(frontmatter) == 2  # Only valid key:value pairs
+
+    def test_frontmatter_with_empty_lines_skips_them(self):
+        """Empty lines in frontmatter should be skipped."""
+        content = """---
+
+type: "Guideline"
+
+author: "Test"
+
+---
+
+# Title
+"""
+        frontmatter, body = parse_frontmatter(content)
+
+        assert frontmatter["type"] == "Guideline"
+        assert frontmatter["author"] == "Test"
+
 
 class TestParseTitle:
     """Tests for parse_title function."""
