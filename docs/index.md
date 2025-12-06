@@ -4,7 +4,11 @@ A simple MCP server that gives AI assistants access to your document library.
 
 Point it at a folder of Markdown files, and your AI assistant can browse, search, and compare document versions. It is a poor's man’s document management system designed for easy integration with AI tools. You only need a folder of properly formatted Markdown files as your source. 
 
-This tool is ideal for teams wanting to leverage AI for document retrieval and analysis without complex setups. It does not manage the approval cycle or enforce workflows; it simply provides structured access to your documents. It does not version control your files, that has to be done externally (e.g., Git, manual versioning).
+This tool is ideal if you want to give your LLM based Agent read-only access without complex setups. It does not manage the approval cycle or enforce workflows; it simply provides structured access to your documents. It does not version control your files, that has to be done externally (e.g., Git, manual versioning).
+
+## Why Folios?
+
+This tool is to mock access to more complex document management engineering systems (think SAP, PTC Windchill, Siemens TeamCenter...). It is designed for simplicity and ease of use, not for production use in regulated environments.
 
 ## What It Does
 
@@ -104,7 +108,7 @@ FOLIOS_PATH=/path/to/docs uvx folios-mcp
 
 ## Document Requirements
 
-Folios expects Markdown files with a specific structure:
+Folios expects that the selected folder contains Markdown files with a specific structure:
 
 ### File Naming
 
@@ -112,9 +116,9 @@ Files must follow the pattern `{id}_v{version}.md`:
 
 ```
 documents/
-├── 100001_v1.md    # Document 100001, version 1
-├── 100001_v2.md    # Document 100001, version 2
-└── 100002_v1.md    # Document 100002, version 1
+├── 123456_v1.md    # Document 123456, version 1
+├── 123456_v2.md    # Document 123456, version 2
+└── 789012_v1.md    # Document 789012, version 1
 ```
 
 ### YAML Frontmatter
@@ -168,13 +172,62 @@ More content...
 
 Once configured, you can ask your AI assistant:
 
-> "List all approved design practices"
+**"List all approved design practices"**
 
-> "Show me the latest version of document 100001"
+```json
+[
+  {
+    "id": "123456",
+    "title": "Stress Analysis Design Practice",
+    "type": "Design Practice",
+    "status": "Approved",
+    "latest_version": 2,
+    "author": "J. Smith",
+    "date": "2025-02-15"
+  }
+]
+```
 
-> "What changed between version 1 and version 2 of document 100001?"
+**"Show me the latest version of document 123456"**
 
-> "Find all documents by John Smith"
+```
+# Introduction
+
+This document defines the stress analysis design practice for
+turbine rear structure components.
+
+## Purpose
+
+The purpose of this design practice is to establish standardized
+methods for conducting stress analysis on TRS components.
+...
+```
+
+**"What changed between version 1 and version 2 of document 123456?"**
+
+```
+Summary of changes:
+- Added "vanes, hub, and outer case" to scope
+- Added non-linear analysis option for contact regions
+- Added "Emergency shutdown" load case
+- Added new "Thermal Analysis" section
+- Added fatigue life requirement (20,000 cycles minimum)
+- Added References section with ASTM and MIL-HDBK standards
+```
+
+**"Find all documents by J. Smith"**
+
+```json
+[
+  {
+    "id": "123456",
+    "title": "Stress Analysis Design Practice",
+    "type": "Design Practice",
+    "status": "Approved",
+    "latest_version": 2
+  }
+]
+```
 
 ## More Information
 
