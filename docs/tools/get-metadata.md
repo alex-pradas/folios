@@ -74,8 +74,20 @@ Returns structured metadata:
 }
 ```
 
+**Read error (permission denied, network error, etc.):**
+
+```json
+{
+  "error": {
+    "code": "READ_ERROR",
+    "message": "[EACCES] Permission denied (file: /path/to/document.md)"
+  }
+}
+```
+
 ## Notes
 
 - Validates document structure (unlike `get_document_content`)
 - Missing optional fields show as "NA"
 - Chapters are extracted from `##` headings only
+- Gracefully handles remote drive errors (network issues, permission changes)
