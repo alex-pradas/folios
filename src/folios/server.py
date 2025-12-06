@@ -367,37 +367,39 @@ server = FastMCP(
 
 
 @server.tool
-def get_document(id: int, version: int | None = None) -> dict:
-    """Get document content by ID.
+def get_document_content(document_id: int, version: int | None = None) -> dict:
+    """Retrieve the full content of a document.
 
     Args:
-        id: The numeric document ID.
-        version: Specific version number, or None for latest version.
+        document_id: Unique numeric identifier of the document.
+        version: Specific version number to retrieve. If not provided, returns the latest version.
 
     Returns:
-        Dict with 'content' key on success, or 'error' key on failure.
+        On success: {"content": "<full markdown content>"}
+        On error: {"error": {"code": "NOT_FOUND", "message": "..."}}
     """
     try:
-        path, _ = find_document_path(id, version)
+        path, _ = find_document_path(document_id, version)
         return {"content": path.read_text(encoding="utf-8")}
     except FileNotFoundError as e:
         return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
 
 
 @server.tool
-def get_document_metadata(id: int, version: int | None = None) -> dict:
-    """Get document metadata by ID.
+def get_document_metadata(document_id: int, version: int | None = None) -> dict:
+    """Retrieve metadata for a document including title, author, status, and chapters.
 
     Args:
-        id: The numeric document ID.
-        version: Specific version number, or None for latest version.
+        document_id: Unique numeric identifier of the document.
+        version: Specific version number. If not provided, returns metadata for the latest version.
 
     Returns:
-        Dict with 'metadata' key on success, or 'error' key on failure.
+        On success: {"metadata": {id, version, title, type, author, reviewer, approver, date, status, chapters}}
+        On error: {"error": {"code": "NOT_FOUND"|"INVALID_FORMAT", "message": "..."}}
     """
     try:
-        path, resolved_version = find_document_path(id, version)
-        metadata, _ = parse_document(path, id, resolved_version)
+        path, resolved_version = find_document_path(document_id, version)
+        metadata, _ = parse_document(path, document_id, resolved_version)
         return {"metadata": metadata.model_dump()}
     except FileNotFoundError as e:
         return {"error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()}
@@ -408,25 +410,26 @@ def get_document_metadata(id: int, version: int | None = None) -> dict:
 
 
 @server.tool
-def compare_versions(
-    id: int,
-    old_version: int,
-    new_version: int,
+def diff_document_versions(
+    document_id: int,
+    from_version: int,
+    to_version: int,
 ) -> dict:
-    """Compare two versions of a document.
+    """Generate a unified diff between two versions of a document.
 
     Args:
-        id: The numeric document ID.
-        old_version: The older version number.
-        new_version: The newer version number.
+        document_id: Unique numeric identifier of the document.
+        from_version: The older version number to compare from.
+        to_version: The newer version number to compare to.
 
     Returns:
-        Dict with 'diff' key containing unified diff text on success,
-        or 'error' key on failure.
+        On success: {"diff": "<unified diff text>"}
+        On no changes: {"diff": "No changes between versions."}
+        On error: {"error": {"code": "NOT_FOUND", "message": "..."}}
     """
     try:
-        old_path, _ = find_document_path(id, old_version)
-        new_path, _ = find_document_path(id, new_version)
+        old_path, _ = find_document_path(document_id, from_version)
+        new_path, _ = find_document_path(document_id, to_version)
 
         old_content = old_path.read_text(encoding="utf-8")
         new_content = new_path.read_text(encoding="utf-8")
@@ -437,8 +440,8 @@ def compare_versions(
         diff_lines = difflib.unified_diff(
             old_lines,
             new_lines,
-            fromfile=f"{id}_v{old_version}.md",
-            tofile=f"{id}_v{new_version}.md",
+            fromfile=f"{document_id}_v{from_version}.md",
+            tofile=f"{document_id}_v{to_version}.md",
         )
         diff_text = "".join(diff_lines)
 
@@ -453,35 +456,37 @@ def compare_versions(
 @server.tool
 def list_documents(
     status: str | None = None,
-    type: str | None = None,
+    document_type: str | None = None,
     author: str | None = None,
 ) -> list[DocumentSummary]:
-    """List documents with optional filters.
+    """List all documents with optional filtering.
 
     Args:
-        status: Filter by status (Draft, In Review, Approved, Withdrawn).
-        type: Filter by document type (Design Practice, Guideline, etc.).
+        status: Filter by document status (Draft, In Review, Approved, Withdrawn).
+        document_type: Filter by document type (Design Practice, Guideline, TRS, etc.).
         author: Filter by author name (case-insensitive substring match).
 
     Returns:
-        List of DocumentSummary with id, title, latest_version, status, and type.
+        List of documents with {id, title, latest_version, status, type} for each.
+        Returns empty list if no documents match the filters.
     """
-    return scan_documents(status=status, doc_type=type, author=author)
+    return scan_documents(status=status, doc_type=document_type, author=author)
 
 
 @server.tool
-def list_versions(id: int) -> dict:
-    """List all versions of a document.
+def list_document_versions(document_id: int) -> dict:
+    """List all available versions of a specific document.
 
     Args:
-        id: The numeric document ID.
+        document_id: Unique numeric identifier of the document.
 
     Returns:
-        Dict with 'versions' key on success, or 'error' key on failure.
+        On success: {"versions": [{version, date, status, author}, ...]}
+        On error: {"error": {"code": "NOT_FOUND", "message": "..."}}
     """
     versions = []
     for doc_id, version, path in get_all_document_files():
-        if doc_id != id:
+        if doc_id != document_id:
             continue
 
         try:
@@ -500,7 +505,7 @@ def list_versions(id: int) -> dict:
     if not versions:
         return {
             "error": ErrorResponse(
-                code="NOT_FOUND", message=f"Document {id} not found"
+                code="NOT_FOUND", message=f"Document {document_id} not found"
             ).model_dump()
         }
 

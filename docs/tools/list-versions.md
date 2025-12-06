@@ -1,12 +1,12 @@
-# list_versions
+# list_document_versions
 
-Shows all versions of a document with their metadata.
+Lists all available versions of a specific document.
 
 ## Parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | integer | Yes | The document ID |
+| `document_id` | integer | Yes | Unique numeric identifier of the document |
 
 ## Response
 
@@ -57,4 +57,4 @@ Returns version history:
 
 - Versions are sorted in ascending order (oldest first)
 - Malformed versions are skipped
-- Use `compare_versions` to see what changed between versions
+- Use `diff_document_versions` to see what changed between versions

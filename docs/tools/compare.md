@@ -1,4 +1,4 @@
-# compare_versions
+# diff_document_versions
 
 Generates a unified diff between two versions of a document.
 
@@ -6,9 +6,9 @@ Generates a unified diff between two versions of a document.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | integer | Yes | The document ID |
-| `old_version` | integer | Yes | The older version |
-| `new_version` | integer | Yes | The newer version |
+| `document_id` | integer | Yes | Unique numeric identifier of the document |
+| `from_version` | integer | Yes | The older version number to compare from |
+| `to_version` | integer | Yes | The newer version number to compare to |
 
 ## Response
 

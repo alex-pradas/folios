@@ -6,11 +6,11 @@ Folios provides 5 MCP tools for document management. Your AI assistant will use 
 
 | Tool | Purpose |
 |------|---------|
-| [`get_document`](get-document.md) | Retrieve raw document content |
+| [`get_document_content`](get-document.md) | Retrieve raw document content |
 | [`get_document_metadata`](get-metadata.md) | Get structured metadata and chapters |
 | [`list_documents`](list-documents.md) | Browse and filter documents |
-| [`list_versions`](list-versions.md) | View version history for a document |
-| [`compare_versions`](compare.md) | Generate diffs between versions |
+| [`list_document_versions`](list-versions.md) | View version history for a document |
+| [`diff_document_versions`](compare.md) | Generate diffs between versions |
 
 ## How It Works
 
@@ -18,7 +18,7 @@ When you ask your AI assistant something like:
 
 > "Show me document 100001"
 
-The assistant calls `get_document` with `id=100001` and returns the content.
+The assistant calls `get_document_content` with `document_id=100001` and returns the content.
 
 > "What documents are approved?"
 
@@ -26,7 +26,7 @@ The assistant calls `list_documents` with `status="Approved"` and shows the resu
 
 > "What changed in the latest version?"
 
-The assistant calls `list_versions` to find versions, then `compare_versions` to show the diff.
+The assistant calls `list_document_versions` to find versions, then `diff_document_versions` to show the diff.
 
 ## Error Handling
 

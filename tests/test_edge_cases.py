@@ -4,11 +4,11 @@ import pytest
 from pathlib import Path
 
 from folios.server import (
-    get_document,
+    get_document_content,
     get_document_metadata,
     list_documents,
-    list_versions,
-    compare_versions,
+    list_document_versions,
+    diff_document_versions,
 )
 
 
@@ -65,7 +65,7 @@ class TestMalformedDocuments:
         """get_document returns raw content regardless of format validity."""
         create_document(3005, 1, malformed_frontmatter_content)
 
-        result = get_document.fn(3005, 1)
+        result = get_document_content.fn(3005, 1)
 
         # get_document just reads the file, doesn't parse
         assert "content" in result
@@ -129,7 +129,7 @@ Content here.
         create_document(4003, 1, valid_doc_content)
         create_document(4003, 2, malformed_frontmatter_content)
 
-        result = list_versions.fn(4003)
+        result = list_document_versions.fn(4003)
 
         assert "versions" in result
         assert len(result["versions"]) == 1
@@ -142,7 +142,7 @@ Content here.
         create_document(4004, 1, malformed_frontmatter_content)
         create_document(4004, 2, malformed_frontmatter_content)
 
-        result = list_versions.fn(4004)
+        result = list_document_versions.fn(4004)
 
         assert "error" in result
         assert result["error"]["code"] == "NOT_FOUND"
@@ -284,7 +284,7 @@ class TestDiffEdgeCases:
         """Comparing version with itself returns no changes."""
         create_document(7001, 1, valid_doc_content)
 
-        result = compare_versions.fn(7001, 1, 1)
+        result = diff_document_versions.fn(7001, 1, 1)
 
         assert "diff" in result
         assert result["diff"] == "No changes between versions."
@@ -297,7 +297,7 @@ class TestDiffEdgeCases:
         create_document(7002, 2, valid_doc_v2_content)
 
         # Compare v2 -> v1 (reversed)
-        result = compare_versions.fn(7002, 2, 1)
+        result = diff_document_versions.fn(7002, 2, 1)
 
         assert "diff" in result
         # Diff should show changes, just in reverse direction

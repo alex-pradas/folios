@@ -6,7 +6,7 @@ Retrieves structured metadata for a document, including auto-parsed chapters fro
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | integer | Yes | The document ID |
+| `document_id` | integer | Yes | Unique numeric identifier of the document |
 | `version` | integer | No | Specific version (defaults to latest) |
 
 ## Response
@@ -76,6 +76,6 @@ Returns structured metadata:
 
 ## Notes
 
-- Validates document structure (unlike `get_document`)
+- Validates document structure (unlike `get_document_content`)
 - Missing optional fields show as "NA"
 - Chapters are extracted from `##` headings only

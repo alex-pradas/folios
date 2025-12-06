@@ -7,7 +7,7 @@ Lists documents in the library with optional filtering.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `status` | string | No | Filter by status |
-| `type` | string | No | Filter by document type |
+| `document_type` | string | No | Filter by document type |
 | `author` | string | No | Filter by author (case-insensitive, partial match) |
 
 ## Response

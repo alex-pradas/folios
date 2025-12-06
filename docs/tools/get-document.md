@@ -1,4 +1,4 @@
-# get_document
+# get_document_content
 
 Retrieves the raw content of a document, including YAML frontmatter.
 
@@ -6,7 +6,7 @@ Retrieves the raw content of a document, including YAML frontmatter.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `id` | integer | Yes | The document ID |
+| `document_id` | integer | Yes | Unique numeric identifier of the document |
 | `version` | integer | No | Specific version (defaults to latest) |
 
 ## Response

@@ -16,11 +16,11 @@ Folios provides **5 MCP tools** for document management:
 
 | Tool | Description |
 |------|-------------|
-| `get_document` | Retrieve document content |
+| `get_document_content` | Retrieve document content |
 | `get_document_metadata` | Get structured metadata and chapters |
 | `list_documents` | Browse and filter documents |
-| `list_versions` | View version history |
-| `compare_versions` | Diff between versions |
+| `list_document_versions` | View version history |
+| `diff_document_versions` | Diff between versions |
 
 ## Quick Setup
 
@@ -178,7 +178,7 @@ More content...
   "tool": "list_documents",
   "parameters": {
     "status": "Approved",
-    "type": "Design Practice"
+    "document_type": "Design Practice"
   }
 }
 ```
@@ -203,7 +203,7 @@ More content...
 {
   "tool": "get_document_metadata",
   "parameters": {
-    "id": 123456
+    "document_id": 123456
   }
 }
 ```
@@ -232,16 +232,16 @@ More content...
 }
 ```
 
-### Compare versions
+### Diff document versions
 
 **Tool call:**
 ```json
 {
-  "tool": "compare_versions",
+  "tool": "diff_document_versions",
   "parameters": {
-    "id": 123456,
-    "old_version": 1,
-    "new_version": 2
+    "document_id": 123456,
+    "from_version": 1,
+    "to_version": 2
   }
 }
 ```
@@ -253,14 +253,14 @@ More content...
 }
 ```
 
-### List all versions of a document
+### List document versions
 
 **Tool call:**
 ```json
 {
-  "tool": "list_versions",
+  "tool": "list_document_versions",
   "parameters": {
-    "id": 123456
+    "document_id": 123456
   }
 }
 ```

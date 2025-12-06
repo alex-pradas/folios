@@ -80,11 +80,11 @@ FOLIOS_PATH=/path/to/docs uvx folios
 
 | Tool | Parameters | Description |
 |------|------------|-------------|
-| `get_document` | `id`, `version?` | Retrieve document content (latest if version omitted) |
-| `get_document_metadata` | `id`, `version?` | Get metadata including auto-parsed chapters |
-| `compare_versions` | `id`, `old_version`, `new_version` | Diff between two versions |
-| `list_documents` | `status?`, `type?`, `author?` | List documents with optional filters |
-| `list_versions` | `id` | List all versions of a document |
+| `get_document_content` | `document_id`, `version?` | Retrieve document content (latest if version omitted) |
+| `get_document_metadata` | `document_id`, `version?` | Get metadata including auto-parsed chapters |
+| `diff_document_versions` | `document_id`, `from_version`, `to_version` | Diff between two versions |
+| `list_documents` | `status?`, `document_type?`, `author?` | List documents with optional filters |
+| `list_document_versions` | `document_id` | List all versions of a document |
 
 ## Document Schema
 

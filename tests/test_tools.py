@@ -4,20 +4,20 @@ import pytest
 from pathlib import Path
 
 from folios.server import (
-    get_document,
+    get_document_content,
     get_document_metadata,
-    compare_versions,
+    diff_document_versions,
     list_documents,
-    list_versions,
+    list_document_versions,
 )
 
 
-class TestGetDocument:
-    """Tests for get_document tool."""
+class TestGetDocumentContent:
+    """Tests for get_document_content tool."""
 
     def test_returns_content_for_valid_doc(self, sample_docs: Path, valid_doc_content: str):
         """Get document returns content for valid document."""
-        result = get_document.fn(1001, 1)
+        result = get_document_content.fn(1001, 1)
 
         assert "content" in result
         assert "error" not in result
@@ -26,14 +26,14 @@ class TestGetDocument:
 
     def test_returns_latest_when_version_none(self, sample_docs: Path):
         """Get document returns latest version when version not specified."""
-        result = get_document.fn(1001)
+        result = get_document_content.fn(1001)
 
         assert "content" in result
         assert "status: \"Approved\"" in result["content"]  # v2 has Approved status
 
     def test_nonexistent_document_returns_error(self, sample_docs: Path):
         """Non-existent document ID returns graceful error response."""
-        result = get_document.fn(9999)
+        result = get_document_content.fn(9999)
 
         assert "error" in result
         assert "content" not in result
@@ -42,7 +42,7 @@ class TestGetDocument:
 
     def test_nonexistent_version_returns_error(self, sample_docs: Path):
         """Non-existent version returns graceful error response."""
-        result = get_document.fn(1001, 99)
+        result = get_document_content.fn(1001, 99)
 
         assert "error" in result
         assert result["error"]["code"] == "NOT_FOUND"
@@ -100,12 +100,12 @@ class TestGetDocumentMetadata:
         assert result["error"]["code"] == "NOT_FOUND"
 
 
-class TestCompareVersions:
-    """Tests for compare_versions tool."""
+class TestDiffDocumentVersions:
+    """Tests for diff_document_versions tool."""
 
     def test_returns_unified_diff(self, sample_docs: Path):
         """Returns unified diff between versions."""
-        result = compare_versions.fn(1001, 1, 2)
+        result = diff_document_versions.fn(1001, 1, 2)
 
         assert "diff" in result
         assert "error" not in result
@@ -120,28 +120,28 @@ class TestCompareVersions:
         create_document(2001, 1, valid_doc_content)
         create_document(2001, 2, valid_doc_content)
 
-        result = compare_versions.fn(2001, 1, 2)
+        result = diff_document_versions.fn(2001, 1, 2)
 
         assert "diff" in result
         assert result["diff"] == "No changes between versions."
 
     def test_old_version_not_found_returns_error(self, sample_docs: Path):
         """Missing old version returns graceful error."""
-        result = compare_versions.fn(1001, 99, 2)
+        result = diff_document_versions.fn(1001, 99, 2)
 
         assert "error" in result
         assert result["error"]["code"] == "NOT_FOUND"
 
     def test_new_version_not_found_returns_error(self, sample_docs: Path):
         """Missing new version returns graceful error."""
-        result = compare_versions.fn(1001, 1, 99)
+        result = diff_document_versions.fn(1001, 1, 99)
 
         assert "error" in result
         assert result["error"]["code"] == "NOT_FOUND"
 
     def test_document_not_found_returns_error(self, sample_docs: Path):
         """Non-existent document returns graceful error."""
-        result = compare_versions.fn(9999, 1, 2)
+        result = diff_document_versions.fn(9999, 1, 2)
 
         assert "error" in result
         assert result["error"]["code"] == "NOT_FOUND"
@@ -175,7 +175,7 @@ class TestListDocuments:
 
     def test_filter_by_type(self, sample_docs: Path):
         """Type filter returns only matching documents."""
-        result = list_documents.fn(type="Guideline")
+        result = list_documents.fn(document_type="Guideline")
 
         assert len(result) == 1
         assert result[0].id == 1002
@@ -218,12 +218,12 @@ class TestListDocuments:
         assert result == []
 
 
-class TestListVersions:
-    """Tests for list_versions tool."""
+class TestListDocumentVersions:
+    """Tests for list_document_versions tool."""
 
     def test_returns_all_versions_sorted(self, sample_docs: Path):
         """Returns all versions in ascending order."""
-        result = list_versions.fn(1001)
+        result = list_document_versions.fn(1001)
 
         assert "versions" in result
         assert len(result["versions"]) == 2
@@ -232,7 +232,7 @@ class TestListVersions:
 
     def test_version_info_includes_metadata(self, sample_docs: Path):
         """Each VersionInfo has version, date, status, author."""
-        result = list_versions.fn(1001)
+        result = list_document_versions.fn(1001)
 
         v1 = result["versions"][0]
         assert v1["version"] == 1
@@ -242,13 +242,13 @@ class TestListVersions:
 
     def test_single_version_document(self, sample_docs: Path):
         """Document with single version returns list of one."""
-        result = list_versions.fn(1002)
+        result = list_document_versions.fn(1002)
 
         assert len(result["versions"]) == 1
 
     def test_nonexistent_document_returns_error(self, sample_docs: Path):
         """Non-existent document returns graceful error."""
-        result = list_versions.fn(9999)
+        result = list_document_versions.fn(9999)
 
         assert "error" in result
         assert "versions" not in result
