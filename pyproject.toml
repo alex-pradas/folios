@@ -1,9 +1,9 @@
 [project]
 name = "folios"
-version = "0.5.0"
+version = "0.5.1"
 description = "MCP server for versioned document retrieval, metadata access, and diff capabilities"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Alejandro Pradas Gómez", email = "alex@pradas.eu" }]
 keywords = ["mcp", "documents", "versioning", "fastmcp"]
@@ -12,6 +12,8 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",

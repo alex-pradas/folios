@@ -1,19 +1,19 @@
 # Folios
 
 <p align="center">
-  <img src="folio_logo.png" alt="Folios Logo" width="120">
+  <img src="https://raw.githubusercontent.com/alex-pradas/folios/main/folio_logo.png" alt="Folios Logo" width="120">
 </p>
 
 [![PyPI version](https://badge.fury.io/py/folios.svg)](https://badge.fury.io/py/folios)
 [![Tests](https://github.com/alex-pradas/folios/actions/workflows/publish.yml/badge.svg)](https://github.com/alex-pradas/folios/actions/workflows/publish.yml)
 [![codecov](https://codecov.io/gh/alex-pradas/folios/branch/main/graph/badge.svg)](https://codecov.io/gh/alex-pradas/folios)
-[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://alex-pradas.github.io/folios/)
 
 A lightweight Model Context Protocol (MCP) server for querying your local library of documents.
 
-![Example](example.png)
+![Example](https://raw.githubusercontent.com/alex-pradas/folios/main/example.png)
 
 **[Documentation](https://alex-pradas.github.io/folios/)**
 
