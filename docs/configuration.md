@@ -123,10 +123,10 @@ Control verbosity via the `FASTMCP_LOG_LEVEL` environment variable:
 
 ```bash
 # Verbose output (shows per-file parsing)
-FASTMCP_LOG_LEVEL=DEBUG uvx folios --folios-path /path/to/docs
+FASTMCP_LOG_LEVEL=DEBUG uvx folios --path /path/to/docs
 
 # Quiet mode
-FASTMCP_LOG_LEVEL=WARNING uvx folios --folios-path /path/to/docs
+FASTMCP_LOG_LEVEL=WARNING uvx folios --path /path/to/docs
 ```
 
 In Claude Desktop configuration:
@@ -136,7 +136,7 @@ In Claude Desktop configuration:
   "mcpServers": {
     "folios": {
       "command": "uvx",
-      "args": ["folios", "--folios-path", "/path/to/documents"],
+      "args": ["folios", "--path", "/path/to/documents"],
       "env": {
         "FASTMCP_LOG_LEVEL": "DEBUG"
       }

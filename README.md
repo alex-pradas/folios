@@ -1,5 +1,9 @@
 # Folios
 
+<p align="center">
+  <img src="folio_logo.png" alt="Folios Logo" width="120">
+</p>
+
 [![PyPI version](https://badge.fury.io/py/folios.svg)](https://badge.fury.io/py/folios)
 [![Tests](https://github.com/alex-pradas/folios/actions/workflows/publish.yml/badge.svg)](https://github.com/alex-pradas/folios/actions/workflows/publish.yml)
 [![codecov](https://codecov.io/gh/alex-pradas/folios/branch/main/graph/badge.svg)](https://codecov.io/gh/alex-pradas/folios)
@@ -7,7 +11,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://alex-pradas.github.io/folios/)
 
-A lightweight Model Context Protocol (MCP) server for giving agents the tools to query your local library of documents.
+A lightweight Model Context Protocol (MCP) server for querying your local library of documents.
+
+![Example](example.png)
 
 **[Documentation](https://alex-pradas.github.io/folios/)**
 
@@ -27,7 +33,7 @@ If you are developing agentic workflows, in order to mock the functionality to g
 ## One-liner to install, run and configure
 
 ```bash
-uvx folios --folios-path /path/to/your/documents
+uvx folios --path /path/to/your/documents
 ```
 
 ## Quick guide to get started
@@ -72,7 +78,7 @@ Only the `---` delimiters and an H1 title are required. Missing fields show "NA"
 you can run folios directly with one terminal command
 
 ```bash
-uvx folios --folios-path /path/to/your/documents
+uvx folios --path /path/to/your/documents
 ```
 
 alternatively, you can add it to your LLM Client MCP configuration:
@@ -82,7 +88,7 @@ alternatively, you can add it to your LLM Client MCP configuration:
   "mcpServers": {
     "folios": {
       "command": "uvx",
-      "args": ["folios", "--folios-path", "/path/to/your/documents"],
+      "args": ["folios", "--path", "/path/to/your/documents"],
       }
     }
   }
@@ -132,7 +138,7 @@ Provide the documents folder path via CLI flag or environment variable:
 
 | Option | Description |
 |--------|-------------|
-| `--folios-path` | Path to documents folder (CLI flag) |
+| `--path` | Path to documents folder (CLI flag) |
 | `FOLIOS_PATH` | Path to documents folder (environment variable) |
 
 ### Field Configuration (Optional)

@@ -12,10 +12,10 @@ from folios.server import main
 class TestMain:
     """Tests for the CLI main() entry point."""
 
-    def test_main_with_folios_path_argument(self, documents_path: Path, monkeypatch):
-        """main() should create server with provided --folios-path."""
+    def test_main_with_path_argument(self, documents_path: Path, monkeypatch):
+        """main() should create server with provided --path."""
         monkeypatch.delenv("FOLIOS_PATH", raising=False)
-        monkeypatch.setattr(sys, "argv", ["folios", "--folios-path", str(documents_path)])
+        monkeypatch.setattr(sys, "argv", ["folios", "--path", str(documents_path)])
 
         # Mock create_server and server.run to prevent actual server startup
         with patch("folios.server.create_server") as mock_create:
@@ -58,7 +58,7 @@ class TestMain:
 
         captured = capsys.readouterr()
         assert "Error: No documents folder specified" in captured.err
-        assert "--folios-path" in captured.err
+        assert "--path" in captured.err
         assert "FOLIOS_PATH" in captured.err
 
     def test_cli_path_takes_priority_over_env(self, tmp_path: Path, monkeypatch):
@@ -69,7 +69,7 @@ class TestMain:
         env_path.mkdir()
 
         monkeypatch.setenv("FOLIOS_PATH", str(env_path))
-        monkeypatch.setattr(sys, "argv", ["folios", "--folios-path", str(cli_path)])
+        monkeypatch.setattr(sys, "argv", ["folios", "--path", str(cli_path)])
 
         with patch("folios.server.create_server") as mock_create:
             mock_server = MagicMock()

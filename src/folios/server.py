@@ -818,14 +818,14 @@ def main():
     """Run the Folios MCP server."""
     parser = argparse.ArgumentParser(description="Folios MCP Server")
     parser.add_argument(
-        "--folios-path",
+        "--path",
         type=Path,
         help="Path to the folder containing versioned documents",
     )
     args = parser.parse_args()
 
     # Resolve documents path: CLI flag > env var > error
-    docs_path = args.folios_path
+    docs_path = args.path
     if docs_path is None:
         env_path = os.environ.get("FOLIOS_PATH")
         if env_path:
@@ -835,7 +835,7 @@ def main():
         print(
             "Error: No documents folder specified.\n\n"
             "Please provide the path to your documents folder using either:\n"
-            "  --folios-path /path/to/documents\n"
+            "  --path /path/to/documents\n"
             "  FOLIOS_PATH=/path/to/documents environment variable",
             file=sys.stderr,
         )
