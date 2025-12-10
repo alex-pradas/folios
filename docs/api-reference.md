@@ -98,10 +98,21 @@ Retrieve the content of a specific chapter (H2 section) from a document.
 
 ```json
 {
-  "content": "## Static Analysis\n\nThis section covers static stress analysis methods...",
+  "content": "## Static Analysis\n\nStatic analysis shall be performed using linear elastic finite element methods...",
   "chapter_title": "Static Analysis"
 }
 ```
+
+**Example with material properties:**
+
+```json
+{
+  "tool": "get_chapter_content",
+  "parameters": {"document_id": 200001, "chapter_title": "Carbon Steels"}
+}
+```
+
+Returns the full chapter including material property tables for AISI 1018 and AISI 1045 steels.
 
 !!! tip "Case-insensitive matching"
     The `chapter_title` parameter is case-insensitive. The response confirms which chapter was actually matched.
@@ -186,8 +197,31 @@ List all documents with optional filtering. Filter values are discovered automat
     "latest_version": 2,
     "status": "Approved",
     "document_type": "Design Practice"
+  },
+  {
+    "id": 200001,
+    "title": "Steel Material Properties Handbook",
+    "latest_version": 1,
+    "status": "Approved",
+    "document_type": "Material Specification"
+  },
+  {
+    "id": 200002,
+    "title": "Component Acceptance Testing Procedure",
+    "latest_version": 1,
+    "status": "Approved",
+    "document_type": "Procedure"
   }
 ]
+```
+
+**Filter by document type:**
+
+```json
+{
+  "tool": "browse_catalog",
+  "parameters": {"document_type": "Material Specification"}
+}
 ```
 
 ---

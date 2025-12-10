@@ -51,9 +51,11 @@ Any normal local folder will do. Documents follow the naming convention `{id}_v{
 
 ```folder
 documents/
-├── 123456_v1.md
-├── 123456_v2.md
-└── 789012_v1.md
+├── 123456_v1.md      # Design Practice (v1)
+├── 123456_v2.md      # Design Practice (v2)
+├── 200001_v1.md      # Material Specification
+├── 200002_v1.md      # Procedure
+└── 789012_v1.md      # Technical Requirements
 ```
 
 ### 2. Add YAML metadata to each document
