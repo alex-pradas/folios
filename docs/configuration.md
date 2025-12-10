@@ -98,7 +98,7 @@ Folios logs server activity to stderr, useful for debugging and monitoring perfo
 ### Example Output
 
 ```
-[12/10/25 21:46:48] INFO     Folios v0.7.1 starting
+[12/10/25 21:46:48] INFO     Folios v0.7.2 starting
                     INFO     Documents path: /path/to/docs
                     INFO     Scanned 42 documents
                     INFO     Schema discovery: 5 fields in 234.5ms
