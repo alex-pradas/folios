@@ -17,11 +17,15 @@ A lightweight Model Context Protocol (MCP) server for querying your local librar
 
 **[Documentation](https://alex-pradas.github.io/folios/)**
 
-## What problem solves folios?
+## What problem does Folios solve?
 
-When working in engineering applications, AI agents often need access to a variety of internal documents such as design practices, guidelines, and specifications that are stored in a local, document-based knowledge management system. While Retreival Augmented Generation (RAG) implementation can provide such functionality, setting it up and maintaining it up to date can be complex and time-consuming. Why not accessing the documents directly? If the master information is stored in documents, Agentic AI is not going to change the quality processes that are already in place to manage knowledge in companies, so I believe in giving agents read-only access to the document library is a more straightforward approach. However, giving agent access to those system repositories con be challenging due to the restricted nature of their APIs or the lack of privileged access.
+AI agents working on engineering tasks often need access to internal documents—design practices, guidelines, specifications—typically stored in document management systems (PLM, QMS...). While RAG (Retrieval Augmented Generation) can provide this functionality, it's complex to set up and maintain.
 
-If you are developing agentic workflows, in order to mock the functionality to give agents the access to such complex management systems, Folios provides a simple MCP server that can be pointed to a folder of properly formatted Markdown files. This allows AI assistants to perform the same query behaviour with a very low setup cost from the user/developer side.
+Why not access the documents directly? LLMs context window size is big enough to handle these documents, or at least whole sections. Also, the master information lives in these documents anyway, AIs or RAGs won't replace the quality processes companies already use to manage knowledge.  Giving agents read-only access to the source library is a more straightforward approach. However, enterprise document repositories often have restricted APIs or require privileged access that's difficult to obtain.
+
+**Folios solves this by providing a simple MCP server that points to a folder of Markdown files.** If you're developing agentic workflows and need to mock or prototype document access before integrating with complex enterprise systems, Folios lets AI assistants query documents with minimal setup.
+
+No RAG pipelines, no finetuning, no extra steps. From source to context window.
 
 ## Features
 
