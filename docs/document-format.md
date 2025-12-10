@@ -63,12 +63,12 @@ department: "Engineering"
 priority: "High"
 ---
 
-See [Configuration](configuration.md) for improving Agents to select the custom fields.
-
 # Document Title
 
 Content...
 ```
+
+See [Configuration](configuration.md) to help agents discover valid field values.
 
 All these fields (`author`, `date`, `status`, `department`, `priority`) appear in the metadata response.
 

@@ -24,7 +24,7 @@ Retrieve the full content of a document.
 
 ```json
 {
-  "content": "---\nid: 123456\nversion: 2\ntitle: \"Stress Analysis Design Practice\"\ndocument_type: \"Design Practice\"\nauthor: \"J. Smith\"\n..."
+  "content": "---\ndocument_type: \"Design Practice\"\nauthor: \"J. Smith\"\ndate: \"2025-02-15\"\nstatus: \"Approved\"\n---\n\n# Stress Analysis Design Practice\n\n..."
 }
 ```
 

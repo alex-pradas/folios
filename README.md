@@ -21,7 +21,7 @@ A lightweight Model Context Protocol (MCP) server for querying your local librar
 
 AI agents working on engineering tasks often need access to internal documents—design practices, guidelines, specifications—typically stored in document management systems (PLM, QMS...). While RAG (Retrieval Augmented Generation) can provide this functionality, it's complex to set up and maintain.
 
-Why not access the documents directly? LLMs context window size is big enough to handle these documents, or at least whole sections. Also, the master information lives in these documents anyway, AIs or RAGs won't replace the quality processes companies already use to manage knowledge.  Giving agents read-only access to the source library is a more straightforward approach. However, enterprise document repositories often have restricted APIs or require privileged access that's difficult to obtain.
+Why not access the documents directly? LLM context windows are big enough to handle these documents, or at least whole sections. Also, the master information lives in these documents anyway, AIs or RAGs won't replace the quality processes companies already use to manage knowledge.  Giving agents read-only access to the source library is a more straightforward approach. However, enterprise document repositories often have restricted APIs or require privileged access that's difficult to obtain.
 
 **Folios solves this by providing a simple MCP server that points to a folder of Markdown files.** If you're developing agentic workflows and need to mock or prototype document access before integrating with complex enterprise systems, Folios lets AI assistants query documents with minimal setup.
 
@@ -75,11 +75,11 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 More text here...
 ```
 
-Only the `---` delimiters and an H1 title are required. Missing fields show "NA" in responses.
+Only the `---` delimiters, an H1 title, and the `{id}_v{version}.md` filename pattern are required. Missing fields show "NA" in responses.
 
 ### 3. Run the server
 
-you can run folios directly with one terminal command
+You can run folios directly with one terminal command:
 
 ```bash
 uvx folios --path /path/to/your/documents
@@ -92,10 +92,10 @@ alternatively, you can add it to your LLM Client MCP configuration:
   "mcpServers": {
     "folios": {
       "command": "uvx",
-      "args": ["folios", "--path", "/path/to/your/documents"],
-      }
+      "args": ["folios", "--path", "/path/to/your/documents"]
     }
   }
+}
 ```
 
 We have tested it with [Claude Desktop](https://claude.ai/desktop) and the [GitHub Copilot Extension for VS Code](https://code.visualstudio.com/docs/copilot/overview), but it should work with any MCP-compatible client.
@@ -106,7 +106,8 @@ We have tested it with [Claude Desktop](https://claude.ai/desktop) and the [GitH
 |------|------------|-------------|
 | `get_document_content` | `document_id`, `version?` | Retrieve document content (latest if version omitted) |
 | `get_document_metadata` | `document_id`, `version?` | Get metadata including auto-parsed chapters |
-| `diff_document_versions` | `document_id`, `from_version`, `to_version` | Diff between two versions |
+| `get_chapter_content` | `document_id`, `chapter_title`, `version?` | Retrieve content of a specific chapter (H2 section) |
+| `diff_document_versions` | `document_id`, `from_version`, `to_version` | Diff between two versions, grouped by chapter |
 | `list_documents` | `status?`, `document_type?`, `author?` | List documents with optional filters |
 | `list_document_versions` | `document_id` | List all versions of a document |
 
@@ -144,23 +145,6 @@ Provide the documents folder path via CLI flag or environment variable:
 |--------|-------------|
 | `--path` | Path to documents folder (CLI flag) |
 | `FOLIOS_PATH` | Path to documents folder (environment variable) |
-
-### Field Configuration (Optional)
-
-Create a `folios.toml` in your documents folder to define allowed values for fields:
-
-```toml
-[fields.status]
-values = ["Draft", "In Review", "Approved", "Withdrawn"]
-
-[fields.document_type]
-values = ["Design Practice", "Guideline", "Best Practice", "TRS"]
-
-[fields.department]
-values = ["Engineering", "Manufacturing", "HR"]
-```
-
-This helps agents understand what values are valid for each field.
 
 ## Development
 

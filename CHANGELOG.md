@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-12-10
+
+### Added
+
+- New `get_chapter_content` tool to retrieve specific H2 sections from documents
+- Chapter-grouped diffs in `diff_document_versions` - changes now organized by chapter name
+- `CHAPTER_NOT_FOUND` error code for invalid chapter requests
+
+### Changed
+
+- `diff_document_versions` response format now returns `{"changes": [{"chapter": "...", "diff": "..."}]}` instead of a single unified diff
+
+### Fixed
+
+- Documentation accuracy improvements across README and docs
+
 ## [0.5.0] - 2025-12-09
 
 ### Changed
