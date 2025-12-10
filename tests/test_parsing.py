@@ -10,6 +10,7 @@ from folios.server import (
     parse_document,
     find_document_path,
     get_all_document_files,
+    extract_chapter_content,
     Chapter,
 )
 
@@ -307,3 +308,106 @@ class TestGetAllDocumentFiles:
 
         files = get_all_document_files(documents_path)
         assert files == []
+
+
+class TestExtractChapterContent:
+    """Tests for extract_chapter_content function."""
+
+    def test_extracts_chapter_by_exact_title(self):
+        """Exact title match extracts correct chapter."""
+        content = """# Title
+
+## Section One
+
+First section content.
+
+## Section Two
+
+Second section content.
+"""
+        result = extract_chapter_content(content, "Section One")
+
+        assert result is not None
+        matched_title, chapter_content = result
+        assert matched_title == "Section One"
+        assert "## Section One" in chapter_content
+        assert "First section content" in chapter_content
+        assert "Section Two" not in chapter_content
+
+    def test_case_insensitive_match(self):
+        """Case-insensitive match works when exact match fails."""
+        content = """## Section One
+
+Content here.
+"""
+        result = extract_chapter_content(content, "section one")
+
+        assert result is not None
+        matched_title, _ = result
+        assert matched_title == "Section One"  # Returns actual title
+
+    def test_exact_match_preferred_over_case_insensitive(self):
+        """Exact match takes precedence over case-insensitive."""
+        content = """## Test
+
+First content.
+
+## test
+
+Second content.
+"""
+        result = extract_chapter_content(content, "test")
+
+        assert result is not None
+        matched_title, chapter_content = result
+        assert matched_title == "test"
+        assert "Second content" in chapter_content
+
+    def test_last_chapter_extends_to_end(self):
+        """Last chapter includes content to end of document."""
+        content = """## First
+
+First content.
+
+## Last
+
+Last content here.
+More last content.
+"""
+        result = extract_chapter_content(content, "Last")
+
+        assert result is not None
+        _, chapter_content = result
+        assert "Last content here" in chapter_content
+        assert "More last content" in chapter_content
+
+    def test_chapter_not_found_returns_none(self):
+        """Non-existent chapter returns None."""
+        content = """## Existing
+
+Content here.
+"""
+        result = extract_chapter_content(content, "Nonexistent")
+
+        assert result is None
+
+    def test_no_chapters_returns_none(self):
+        """Document with no H2 headings returns None."""
+        content = "# Title\n\nJust body text."
+        result = extract_chapter_content(content, "Anything")
+
+        assert result is None
+
+    def test_empty_chapter_content(self):
+        """Chapter with no content between headings."""
+        content = """## Empty
+
+## Next
+
+Has content.
+"""
+        result = extract_chapter_content(content, "Empty")
+
+        assert result is not None
+        _, chapter_content = result
+        assert chapter_content.strip() == "## Empty"

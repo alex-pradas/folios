@@ -289,8 +289,8 @@ class TestDiffEdgeCases:
 
         result = server_tools.diff_document_versions.fn(7001, 1, 1)
 
-        assert "diff" in result
-        assert result["diff"] == "No changes between versions."
+        assert "changes" in result
+        assert result["changes"] == []
 
     def test_reversed_version_order(
         self, set_documents_env: Path, create_document, valid_doc_content: str, valid_doc_v2_content: str, server_tools
@@ -302,9 +302,97 @@ class TestDiffEdgeCases:
         # Compare v2 -> v1 (reversed)
         result = server_tools.diff_document_versions.fn(7002, 2, 1)
 
-        assert "diff" in result
+        assert "changes" in result
         # Diff should show changes, just in reverse direction
-        assert "---" in result["diff"]
+        assert len(result["changes"]) > 0
+        for change in result["changes"]:
+            assert "---" in change["diff"]
+
+    def test_chapter_renamed(
+        self, set_documents_env: Path, create_document, server_tools
+    ):
+        """Renamed chapter appears as two entries: old deleted, new added."""
+        v1 = """---
+status: "Draft"
+---
+
+# Title
+
+## Old Chapter Name
+
+Content here.
+"""
+        v2 = """---
+status: "Draft"
+---
+
+# Title
+
+## New Chapter Name
+
+Content here.
+"""
+        create_document(7003, 1, v1)
+        create_document(7003, 2, v2)
+
+        result = server_tools.diff_document_versions.fn(7003, 1, 2)
+
+        chapter_names = [c["chapter"] for c in result["changes"]]
+        # Both old and new chapter names should appear
+        assert "Old Chapter Name" in chapter_names
+        assert "New Chapter Name" in chapter_names
+
+    def test_multiple_chapters_changed(
+        self, set_documents_env: Path, create_document, server_tools
+    ):
+        """Changes in multiple chapters are all captured."""
+        v1 = """---
+status: "Draft"
+---
+
+# Title
+
+## Chapter A
+
+A content v1.
+
+## Chapter B
+
+B content v1.
+
+## Chapter C
+
+C content v1.
+"""
+        v2 = """---
+status: "Draft"
+---
+
+# Title
+
+## Chapter A
+
+A content v2 modified.
+
+## Chapter B
+
+B content v1.
+
+## Chapter C
+
+C content v2 modified.
+"""
+        create_document(7004, 1, v1)
+        create_document(7004, 2, v2)
+
+        result = server_tools.diff_document_versions.fn(7004, 1, 2)
+
+        chapter_names = [c["chapter"] for c in result["changes"]]
+        # Only changed chapters should appear
+        assert "Chapter A" in chapter_names
+        assert "Chapter C" in chapter_names
+        # Unchanged chapter should not appear
+        assert "Chapter B" not in chapter_names
 
 
 class TestFileScanningErrors:
@@ -331,3 +419,84 @@ class TestFileScanningErrors:
         doc_ids = [doc_id for doc_id, _, _ in result]
         assert 8002 in doc_ids
         assert 8001 not in doc_ids
+
+
+class TestChapterEdgeCases:
+    """Tests for chapter content edge cases."""
+
+    def test_document_with_no_chapters(
+        self, set_documents_env: Path, create_document, server_tools
+    ):
+        """Document with no H2 headings returns CHAPTER_NOT_FOUND."""
+        content = """---
+document_type: "Guideline"
+---
+
+# Title Only
+
+Just body text with no sections.
+"""
+        create_document(9001, 1, content)
+
+        result = server_tools.get_chapter_content.fn(9001, "Any", 1)
+
+        assert "error" in result
+        assert result["error"]["code"] == "CHAPTER_NOT_FOUND"
+
+    def test_chapter_with_special_characters_in_title(
+        self, set_documents_env: Path, create_document, server_tools
+    ):
+        """Chapter titles with special characters work."""
+        content = """---
+document_type: "Guideline"
+---
+
+# Title
+
+## C++ Best Practices
+
+Content about C++.
+
+## FAQ & Troubleshooting
+
+FAQ content.
+"""
+        create_document(9002, 1, content)
+
+        result = server_tools.get_chapter_content.fn(9002, "C++ Best Practices", 1)
+        assert "content" in result
+        assert "Content about C++" in result["content"]
+
+        result2 = server_tools.get_chapter_content.fn(9002, "FAQ & Troubleshooting", 1)
+        assert "content" in result2
+        assert "FAQ content" in result2["content"]
+
+    def test_duplicate_chapter_titles_returns_first(
+        self, set_documents_env: Path, create_document, server_tools
+    ):
+        """When multiple chapters have same title, first is returned."""
+        content = """---
+document_type: "Guideline"
+---
+
+# Title
+
+## Summary
+
+First summary.
+
+## Details
+
+Some details.
+
+## Summary
+
+Second summary.
+"""
+        create_document(9003, 1, content)
+
+        result = server_tools.get_chapter_content.fn(9003, "Summary", 1)
+
+        assert "content" in result
+        assert "First summary" in result["content"]
+        assert "Second summary" not in result["content"]

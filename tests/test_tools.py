@@ -92,30 +92,231 @@ class TestGetDocumentMetadata:
         assert result["error"]["code"] == "NOT_FOUND"
 
 
+class TestGetChapterContent:
+    """Tests for get_chapter_content tool."""
+
+    def test_returns_chapter_content(self, sample_docs: Path, server_tools):
+        """Get chapter returns content for valid chapter."""
+        result = server_tools.get_chapter_content.fn(1001, "Section One", 1)
+
+        assert "content" in result
+        assert "error" not in result
+        assert "## Section One" in result["content"]
+        assert "More content here" in result["content"]
+        assert result["chapter_title"] == "Section One"
+
+    def test_returns_latest_version_when_not_specified(self, sample_docs: Path, server_tools):
+        """Returns chapter from latest version when version=None."""
+        result = server_tools.get_chapter_content.fn(1001, "Section Three")
+
+        assert "content" in result
+        # Section Three only exists in v2
+        assert "New section added in v2" in result["content"]
+
+    def test_case_insensitive_chapter_match(self, sample_docs: Path, server_tools):
+        """Chapter title matching is case-insensitive."""
+        result = server_tools.get_chapter_content.fn(1001, "section one", 1)
+
+        assert "content" in result
+        assert result["chapter_title"] == "Section One"
+
+    def test_nonexistent_document_returns_error(self, sample_docs: Path, server_tools):
+        """Non-existent document returns NOT_FOUND error."""
+        result = server_tools.get_chapter_content.fn(9999, "Any Chapter")
+
+        assert "error" in result
+        assert result["error"]["code"] == "NOT_FOUND"
+        assert "9999" in result["error"]["message"]
+
+    def test_nonexistent_version_returns_error(self, sample_docs: Path, server_tools):
+        """Non-existent version returns NOT_FOUND error."""
+        result = server_tools.get_chapter_content.fn(1001, "Section One", 99)
+
+        assert "error" in result
+        assert result["error"]["code"] == "NOT_FOUND"
+
+    def test_nonexistent_chapter_returns_error(self, sample_docs: Path, server_tools):
+        """Non-existent chapter returns CHAPTER_NOT_FOUND error."""
+        result = server_tools.get_chapter_content.fn(1001, "Nonexistent Chapter", 1)
+
+        assert "error" in result
+        assert result["error"]["code"] == "CHAPTER_NOT_FOUND"
+        assert "Nonexistent Chapter" in result["error"]["message"]
+
+    def test_chapter_in_one_version_not_another(self, sample_docs: Path, server_tools):
+        """Chapter existing in v2 but not v1 returns appropriate error."""
+        # Section Three only in v2
+        result_v1 = server_tools.get_chapter_content.fn(1001, "Section Three", 1)
+        result_v2 = server_tools.get_chapter_content.fn(1001, "Section Three", 2)
+
+        assert "error" in result_v1
+        assert result_v1["error"]["code"] == "CHAPTER_NOT_FOUND"
+
+        assert "content" in result_v2
+        assert "error" not in result_v2
+
+
 class TestDiffDocumentVersions:
     """Tests for diff_document_versions tool."""
 
-    def test_returns_unified_diff(self, sample_docs: Path, server_tools):
-        """Returns unified diff between versions."""
+    def test_returns_chapter_grouped_diff(self, sample_docs: Path, server_tools):
+        """Returns diff grouped by chapter."""
         result = server_tools.diff_document_versions.fn(1001, 1, 2)
 
-        assert "diff" in result
+        assert "changes" in result
         assert "error" not in result
-        assert "---" in result["diff"]
-        assert "+++" in result["diff"]
+        assert isinstance(result["changes"], list)
 
-    def test_identical_versions_no_changes(
-        self, set_documents_env: Path, create_document, valid_doc_content: str, server_tools
+        # Should have changes in multiple chapters
+        chapter_names = [c["chapter"] for c in result["changes"]]
+        assert len(chapter_names) > 0
+
+        # Each change should have chapter and diff keys
+        for change in result["changes"]:
+            assert "chapter" in change
+            assert "diff" in change
+            assert "---" in change["diff"]
+            assert "+++" in change["diff"]
+
+    def test_changes_only_in_metadata(
+        self, set_documents_env: Path, create_document, server_tools
     ):
-        """Comparing identical content returns no changes message."""
-        # Create two versions with identical content
-        create_document(2001, 1, valid_doc_content)
-        create_document(2001, 2, valid_doc_content)
+        """Changes only in frontmatter appear under Metadata."""
+        v1 = """---
+status: "Draft"
+---
+
+# Title
+
+## Section One
+
+Content here.
+"""
+        v2 = """---
+status: "Approved"
+---
+
+# Title
+
+## Section One
+
+Content here.
+"""
+        create_document(2001, 1, v1)
+        create_document(2001, 2, v2)
 
         result = server_tools.diff_document_versions.fn(2001, 1, 2)
 
-        assert "diff" in result
-        assert result["diff"] == "No changes between versions."
+        assert "changes" in result
+        assert len(result["changes"]) == 1
+        assert result["changes"][0]["chapter"] == "Metadata"
+        assert "Draft" in result["changes"][0]["diff"]
+        assert "Approved" in result["changes"][0]["diff"]
+
+    def test_chapter_added(self, sample_docs: Path, server_tools):
+        """New chapter in v2 shows as addition."""
+        # sample_docs has Section Three only in v2
+        result = server_tools.diff_document_versions.fn(1001, 1, 2)
+
+        chapter_names = [c["chapter"] for c in result["changes"]]
+        assert "Section Three" in chapter_names
+
+        # Find the Section Three change
+        section_three = next(
+            c for c in result["changes"] if c["chapter"] == "Section Three"
+        )
+        # Should show additions (+ lines)
+        assert "+" in section_three["diff"]
+
+    def test_chapter_deleted(
+        self, set_documents_env: Path, create_document, server_tools
+    ):
+        """Chapter removed in v2 shows as deletion."""
+        v1 = """---
+status: "Draft"
+---
+
+# Title
+
+## Intro
+
+Intro content.
+
+## To Be Removed
+
+This section will be deleted.
+
+## Conclusion
+
+Final content.
+"""
+        v2 = """---
+status: "Draft"
+---
+
+# Title
+
+## Intro
+
+Intro content.
+
+## Conclusion
+
+Final content.
+"""
+        create_document(2002, 1, v1)
+        create_document(2002, 2, v2)
+
+        result = server_tools.diff_document_versions.fn(2002, 1, 2)
+
+        chapter_names = [c["chapter"] for c in result["changes"]]
+        assert "To Be Removed" in chapter_names
+
+        # Find the deleted chapter
+        deleted = next(c for c in result["changes"] if c["chapter"] == "To Be Removed")
+        # Should show deletions (- lines)
+        assert "-" in deleted["diff"]
+
+    def test_no_changes_returns_empty_array(
+        self, set_documents_env: Path, create_document, valid_doc_content: str, server_tools
+    ):
+        """Comparing identical content returns empty changes array."""
+        create_document(2003, 1, valid_doc_content)
+        create_document(2003, 2, valid_doc_content)
+
+        result = server_tools.diff_document_versions.fn(2003, 1, 2)
+
+        assert "changes" in result
+        assert result["changes"] == []
+
+    def test_document_without_chapters(
+        self, set_documents_env: Path, create_document, server_tools
+    ):
+        """Document with no H2 headings has all changes under Metadata."""
+        v1 = """---
+status: "Draft"
+---
+
+# Title
+
+Body content version 1.
+"""
+        v2 = """---
+status: "Approved"
+---
+
+# Title
+
+Body content version 2.
+"""
+        create_document(2004, 1, v1)
+        create_document(2004, 2, v2)
+
+        result = server_tools.diff_document_versions.fn(2004, 1, 2)
+
+        assert "changes" in result
+        assert len(result["changes"]) == 1
+        assert result["changes"][0]["chapter"] == "Metadata"
 
     def test_old_version_not_found_returns_error(self, sample_docs: Path, server_tools):
         """Missing old version returns graceful error."""

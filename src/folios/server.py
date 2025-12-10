@@ -55,7 +55,7 @@ class VersionInfo(BaseModel):
 class ErrorResponse(BaseModel):
     """Structured error for graceful failure responses."""
 
-    code: str  # "NOT_FOUND", "INVALID_FORMAT", "MISSING_FIELD", "READ_ERROR"
+    code: str  # "NOT_FOUND", "CHAPTER_NOT_FOUND", "INVALID_FORMAT", "MISSING_FIELD", "READ_ERROR"
     message: str
 
 
@@ -184,6 +184,126 @@ def parse_chapters(content: str) -> list[Chapter]:
         title = match.group(1).strip()
         chapters.append(Chapter(title=title))
     return chapters
+
+
+def extract_chapter_content(body: str, chapter_title: str) -> tuple[str, str] | None:
+    """Extract content for a specific chapter (H2 section) from document body.
+
+    Args:
+        body: Document body content (without frontmatter).
+        chapter_title: Title of the chapter to extract.
+
+    Returns:
+        Tuple of (matched_title, content) where content includes the H2 heading
+        and all text until the next H2 or end of document.
+        Returns None if chapter not found.
+
+    Note:
+        Matching is exact first, then case-insensitive as fallback.
+        If multiple chapters have the same title, returns the first occurrence.
+    """
+    headings = list(HEADING_PATTERN.finditer(body))
+
+    if not headings:
+        return None
+
+    # Find matching chapter (exact match first, then case-insensitive)
+    target_idx = None
+    matched_title = None
+
+    # Exact match
+    for idx, match in enumerate(headings):
+        if match.group(1).strip() == chapter_title:
+            target_idx = idx
+            matched_title = match.group(1).strip()
+            break
+
+    # Case-insensitive fallback
+    if target_idx is None:
+        chapter_title_lower = chapter_title.lower()
+        for idx, match in enumerate(headings):
+            if match.group(1).strip().lower() == chapter_title_lower:
+                target_idx = idx
+                matched_title = match.group(1).strip()
+                break
+
+    if target_idx is None:
+        return None
+
+    # Extract content from heading start to next heading or end
+    start_pos = headings[target_idx].start()
+    if target_idx + 1 < len(headings):
+        end_pos = headings[target_idx + 1].start()
+    else:
+        end_pos = len(body)
+
+    content = body[start_pos:end_pos].rstrip()
+    return (matched_title, content)
+
+
+def get_chapter_boundaries(content: str) -> list[tuple[str, int, int]]:
+    """Get chapter boundaries as (name, start_line, end_line) tuples.
+
+    Args:
+        content: Full document content including frontmatter.
+
+    Returns:
+        List of (chapter_name, start_line, end_line) tuples.
+        Line numbers are 1-indexed.
+        First entry is always "Metadata" covering everything before first H2.
+        If no H2 headings exist, returns single "Metadata" entry for entire doc.
+    """
+    lines = content.splitlines()
+    total_lines = len(lines)
+
+    if total_lines == 0:
+        return [("Metadata", 1, 1)]
+
+    # Find all H2 heading line numbers (1-indexed)
+    h2_positions: list[tuple[str, int]] = []
+    for i, line in enumerate(lines, start=1):
+        match = HEADING_PATTERN.match(line)
+        if match:
+            h2_positions.append((match.group(1).strip(), i))
+
+    boundaries: list[tuple[str, int, int]] = []
+
+    if not h2_positions:
+        # No chapters - entire document is "Metadata"
+        return [("Metadata", 1, total_lines)]
+
+    # Metadata section: line 1 to line before first H2
+    first_h2_line = h2_positions[0][1]
+    if first_h2_line > 1:
+        boundaries.append(("Metadata", 1, first_h2_line - 1))
+
+    # Each chapter: from H2 line to line before next H2 (or end)
+    for i, (title, start_line) in enumerate(h2_positions):
+        if i + 1 < len(h2_positions):
+            end_line = h2_positions[i + 1][1] - 1
+        else:
+            end_line = total_lines
+        boundaries.append((title, start_line, end_line))
+
+    return boundaries
+
+
+def get_line_to_chapter_map(
+    boundaries: list[tuple[str, int, int]]
+) -> dict[int, str]:
+    """Create a mapping from line number to chapter name.
+
+    Args:
+        boundaries: Output from get_chapter_boundaries().
+
+    Returns:
+        Dict mapping line number (1-indexed) to chapter name.
+    """
+    line_map: dict[int, str] = {}
+    for chapter_name, start, end in boundaries:
+        for line_num in range(start, end + 1):
+            line_map[line_num] = chapter_name
+    return line_map
 
 
 def parse_document(
@@ -596,12 +716,97 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             }
 
     @server.tool
+    def get_chapter_content(
+        document_id: int,
+        chapter_title: str,
+        version: int | None = None,
+    ) -> dict:
+        """Retrieve the content of a specific chapter (H2 section) from a document.
+
+        Args:
+            document_id: Unique numeric identifier of the document.
+            chapter_title: Title of the chapter to retrieve (case-insensitive match).
+            version: Specific version number. If not provided, uses the latest version.
+
+        Returns:
+            On success: {"content": "<chapter content including heading>", "chapter_title": "<matched title>"}
+            On error: {"error": {"code": "NOT_FOUND"|"CHAPTER_NOT_FOUND"|"READ_ERROR", "message": "..."}}
+
+        Example:
+            Tool call:
+            ```json
+            {"tool": "get_chapter_content", "parameters": {"document_id": 123456, "chapter_title": "Methodology"}}
+            ```
+
+            Response:
+            ```json
+            {
+              "content": "## Methodology\\n\\nThis section describes the methodology...",
+              "chapter_title": "Methodology"
+            }
+            ```
+        """
+        logger.info(
+            f"get_chapter_content(document_id={document_id}, chapter_title={chapter_title!r}, version={version})"
+        )
+        start = time.perf_counter()
+        try:
+            path, _ = find_document_path(docs_path, document_id, version)
+            content = path.read_text(encoding="utf-8")
+            _, body = parse_frontmatter(content)
+
+            result = extract_chapter_content(body, chapter_title)
+            if result is None:
+                return {
+                    "error": ErrorResponse(
+                        code="CHAPTER_NOT_FOUND",
+                        message=f"Chapter '{chapter_title}' not found in document {document_id}",
+                    ).model_dump()
+                }
+
+            matched_title, chapter_content = result
+            elapsed_ms = (time.perf_counter() - start) * 1000
+            logger.debug(
+                f"Returned {len(chapter_content)}B chapter content in {elapsed_ms:.1f}ms"
+            )
+            return {"content": chapter_content, "chapter_title": matched_title}
+
+        except FileNotFoundError as e:
+            return {
+                "error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()
+            }
+        except ValueError as e:
+            return {
+                "error": ErrorResponse(
+                    code="INVALID_FORMAT", message=str(e)
+                ).model_dump()
+            }
+        except UnicodeDecodeError as e:
+            return {
+                "error": ErrorResponse(
+                    code="READ_ERROR", message=f"File encoding error: {e.reason}"
+                ).model_dump()
+            }
+        except MemoryError:
+            return {
+                "error": ErrorResponse(
+                    code="READ_ERROR", message="File too large to read into memory"
+                ).model_dump()
+            }
+        except OSError as e:
+            return {
+                "error": ErrorResponse(
+                    code="READ_ERROR", message=format_os_error(e)
+                ).model_dump()
+            }
+
+    @server.tool
     def diff_document_versions(
         document_id: int,
         from_version: int,
         to_version: int,
     ) -> dict:
-        """Generate a unified diff between two versions of a document.
+        """Generate a diff between two versions, grouped by chapter.
 
         Args:
             document_id: Unique numeric identifier of the document.
@@ -609,8 +814,10 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             to_version: The newer version number to compare to.
 
         Returns:
-            On success: {"diff": "<unified diff text>"}
-            On no changes: {"diff": "No changes between versions."}
+            On success: {"changes": [{"chapter": "<name>", "diff": "<unified diff>"}, ...]}
+                Only chapters with changes are included.
+                "Metadata" covers frontmatter, title, and content before first H2.
+            On no changes: {"changes": []}
             On error: {"error": {"code": "NOT_FOUND"|"READ_ERROR", "message": "..."}}
 
         Example:
@@ -621,7 +828,12 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
 
             Response:
             ```json
-            {"diff": "--- 123456_v1.md\\n+++ 123456_v2.md\\n@@ -5,7 +5,7 @@\\n..."}
+            {
+              "changes": [
+                {"chapter": "Metadata", "diff": "--- ...\\n+++ ...\\n@@ -1,5 +1,5 @@\\n..."},
+                {"chapter": "Methodology", "diff": "--- ...\\n+++ ...\\n@@ -20,3 +20,5 @@\\n..."}
+              ]
+            }
             ```
         """
         logger.info(
@@ -635,23 +847,65 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             old_content = old_path.read_text(encoding="utf-8")
             new_content = new_path.read_text(encoding="utf-8")
 
-            old_lines = old_content.splitlines(keepends=True)
-            new_lines = new_content.splitlines(keepends=True)
+            # Get chapter boundaries for both versions
+            old_boundaries = get_chapter_boundaries(old_content)
+            new_boundaries = get_chapter_boundaries(new_content)
 
-            diff_lines = difflib.unified_diff(
-                old_lines,
-                new_lines,
-                fromfile=f"{document_id}_v{from_version}.md",
-                tofile=f"{document_id}_v{to_version}.md",
-            )
-            diff_text = "".join(diff_lines)
+            # Build line-to-chapter maps
+            old_line_map = get_line_to_chapter_map(old_boundaries)
+            new_line_map = get_line_to_chapter_map(new_boundaries)
+
+            # Collect all unique chapter names (preserving order from both versions)
+            seen_chapters: set[str] = set()
+            all_chapters: list[str] = []
+            for name, _, _ in old_boundaries + new_boundaries:
+                if name not in seen_chapters:
+                    seen_chapters.add(name)
+                    all_chapters.append(name)
+
+            # Split content into lines (without line endings for comparison)
+            old_lines = old_content.splitlines()
+            new_lines = new_content.splitlines()
+
+            # For each chapter, extract relevant lines and compute diff
+            changes: list[dict[str, str]] = []
+
+            for chapter_name in all_chapters:
+                # Get line ranges for this chapter in both versions
+                old_chapter_lines: list[str] = []
+                new_chapter_lines: list[str] = []
+
+                for line_num, line in enumerate(old_lines, start=1):
+                    if old_line_map.get(line_num) == chapter_name:
+                        old_chapter_lines.append(line)
+
+                for line_num, line in enumerate(new_lines, start=1):
+                    if new_line_map.get(line_num) == chapter_name:
+                        new_chapter_lines.append(line)
+
+                # Generate diff for this chapter
+                diff_lines = list(
+                    difflib.unified_diff(
+                        old_chapter_lines,
+                        new_chapter_lines,
+                        fromfile=f"{document_id}_v{from_version}.md",
+                        tofile=f"{document_id}_v{to_version}.md",
+                        lineterm="",
+                    )
+                )
+
+                # Only include if there are actual changes
+                if diff_lines:
+                    diff_text = "\n".join(diff_lines)
+                    changes.append({"chapter": chapter_name, "diff": diff_text})
+
             elapsed_ms = (time.perf_counter() - start) * 1000
-            logger.debug(f"Generated diff in {elapsed_ms:.1f}ms")
+            logger.debug(
+                f"Generated chapter-grouped diff ({len(changes)} chapters changed) in {elapsed_ms:.1f}ms"
+            )
 
-            if not diff_text:
-                return {"diff": "No changes between versions."}
+            return {"changes": changes}
 
-            return {"diff": diff_text}
         except FileNotFoundError as e:
             return {
                 "error": ErrorResponse(code="NOT_FOUND", message=str(e)).model_dump()
