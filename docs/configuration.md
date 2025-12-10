@@ -4,15 +4,15 @@ Folios works out of the box with zero configuration. Just point it at a folder o
 
 ## Automatic Schema Discovery
 
-When Folios starts, it scans all documents in your folder and discovers the unique values for each frontmatter field. This information is then included in the MCP tool descriptions so AI agents know exactly what filter values are available.
+When Folios starts, it scans all documents in your folder and discovers the unique values for each metadata field. This information is then included in the MCP tool descriptions so AI agents know exactly what filter values are available.
 
 ### How It Works
 
 1. **At startup**, Folios reads all `.md` files matching the `{id}_v{version}.md` pattern
-2. **Extracts frontmatter** from each document
+2. **Extracts metadata** from each document
 3. **Collects unique values** for each field across all documents
 4. **Classifies fields** as enumerable (≤15 unique values) or free-text (>15 values)
-5. **Includes hints** in the `browse_catalog` tool description
+5. **Includes hints** in the `browse_catalog` tool description for the Agent to know
 
 ### Example
 
@@ -98,7 +98,7 @@ Folios logs server activity to stderr, useful for debugging and monitoring perfo
 ### Example Output
 
 ```
-[12/06/25 21:46:48] INFO     Folios v0.5.1 starting
+[12/10/25 21:46:48] INFO     Folios v0.7.1 starting
                     INFO     Documents path: /path/to/docs
                     INFO     Scanned 42 documents
                     INFO     Schema discovery: 5 fields in 234.5ms
@@ -148,9 +148,10 @@ In Claude Desktop configuration:
 !!! note
     Logs go to stderr, so they won't interfere with the MCP protocol on stdout. In Claude Desktop, logs are captured but not displayed to the user.
 
+!!! warning "Restart required for new documents"
+    Schema discovery happens at server startup only. Adding new documents requires restarting the server to pick up changes.
+
 ## Notes
 
-- Discovery happens at server startup only
-- Adding new documents requires restarting the server to update the schema
 - Documents with parsing errors are skipped gracefully
 - Non-string values are converted to strings for filtering

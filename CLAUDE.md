@@ -2,18 +2,13 @@
 
 ## Release Process
 
-When the user says "ready to release" or "release vX.Y.Z", follow these steps systematically:
+Use the `/release` slash command for releases. It handles:
 
-1. **Check git log** for changes since last release
-2. **Bump version** in `pyproject.toml`
-3. **Update CHANGELOG.md** with new section following Keep a Changelog format:
-   - Added, Changed, Fixed, Removed sections as needed
-   - Date in YYYY-MM-DD format
-4. **Run tests** via `uv run pytest` to verify everything passes
-5. **Commit** all changes with message: `v{version}: {brief summary}`
-6. **Push** to main
-7. **Create GitHub release** via `gh release create v{version}` with release notes
-   - This automatically creates the git tag and triggers PyPI publish
+1. **Documentation validation** - Ensures doc examples match actual tool outputs
+2. **Version updates** - Bumps version in pyproject.toml and docs
+3. **Changelog** - Drafts entry and asks for user confirmation before proceeding
+4. **Tests** - Runs pytest to verify everything passes
+5. **Release** - Commits, pushes, and creates GitHub release
 
 The CI workflow (`.github/workflows/publish.yml`) automatically publishes to PyPI when a release is published.
 

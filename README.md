@@ -31,7 +31,7 @@ No RAG pipelines, no finetuning, no extra steps. From source to context window.
 
 - **Zero Config** - Just point to a folder of Markdown files and go
 - **Local First** - Your documents stay on your machine or network, no cloud dependencies
-- **Flexible Metadata** - Use any frontmatter fields your workflow needs
+- **Flexible Metadata** - Use any YAML metadata fields your workflow needs
 - **Versioned Documents** - Store multiple versions with simple `{id}_v{version}.md` naming
 - **Chapter Extraction** - Retrieve specific sections without loading entire documents
 - **Version Diffing** - Compare changes between document versions, grouped by chapter
@@ -56,9 +56,9 @@ documents/
 └── 789012_v1.md
 ```
 
-### 2. Add YAML frontmatter to each document
+### 2. Add YAML metadata to each document
 
-Frontmatter is flexible - include any fields your workflow requires:
+Metadata is flexible - include any fields your workflow requires:
 
 ```markdown
 ---
@@ -78,7 +78,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 More text here...
 ```
 
-Only the `---` delimiters, an H1 title, and the `{id}_v{version}.md` filename pattern are required. Missing fields show "NA" in responses.
+Only an H1 title and the `{id}_v{version}.md` filename pattern are required. Metadata is optional—missing fields show "NA" in responses.
 
 ### 3. Run the server
 
@@ -125,13 +125,13 @@ These fields are always present in metadata responses:
 | `id` | int | Unique document identifier (from filename) |
 | `version` | int | Version number (from filename) |
 | `title` | str | Document title (from H1 heading) |
-| `author` | str | Document author ("NA" if not in frontmatter) |
-| `date` | str | Publication date ("NA" if not in frontmatter) |
+| `author` | str | Document author ("NA" if not in metadata) |
+| `date` | str | Publication date ("NA" if not in metadata) |
 | `chapters` | list | Auto-parsed from H2 headings |
 
 ### Dynamic Fields
 
-Any additional frontmatter fields are included in metadata responses. Common examples:
+Any additional YAML fields are included in metadata responses. Common examples:
 
 - `document_type` - Document type (Design Practice, Guideline, etc.)
 - `status` - Document status (Draft, Approved, etc.)

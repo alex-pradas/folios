@@ -1,6 +1,6 @@
 # Document Format
 
-Folios uses Markdown files with optional YAML frontmatter. This page explains what's required, what's optional, and how metadata flows into tool responses.
+Folios uses Markdown files with optional YAML metadata. This page explains what's required, what's optional, and how metadata flows into tool responses.
 
 ## Minimum Requirements
 
@@ -17,9 +17,10 @@ That's it. The simplest valid document:
 Content here.
 ```
 
-Frontmatter is entirely optional. But, if you don't include it, `author` and `date` will show as "NA" in responses. This is because the tools that return metadata always include these fields.
+!!! tip "Metadata is optional"
+    The YAML metadata block is entirely optional. If you don't include it, `author` and `date` will show as "NA" in responses because the tools always include these fields.
 
-In addition, you can add any other fields you want to the frontmatter. See "Adding Custom Fields" below.
+    You can add any fields you want to the metadata. See "Adding Custom Fields" below.
 
 ## File Naming
 
@@ -44,15 +45,15 @@ When you call `get_document_metadata` or `browse_catalog`, Folios returns struct
 | `id` | Filename | — |
 | `version` | Filename | — |
 | `title` | First H1 heading | — |
-| `author` | Frontmatter | "NA" |
-| `date` | Frontmatter | "NA" |
+| `author` | YAML metadata | "NA" |
+| `date` | YAML metadata | "NA" |
 | `chapters` | H2 headings | [] |
 
-If `author` or `date` are missing from the frontmatter, they show as "NA" in responses.
+If `author` or `date` are missing from the metadata, they show as "NA" in responses.
 
 ## Adding Custom Fields
 
-Any field you add to the frontmatter is included in metadata responses:
+Any field you add to the YAML metadata is included in responses:
 
 ```markdown
 ---
@@ -68,7 +69,7 @@ priority: "High"
 Content...
 ```
 
-See [Configuration](configuration.md) to help agents discover valid field values.
+See [Configuration](configuration.md) to learn how Folios automatically discovers field values for filtering.
 
 All these fields (`author`, `date`, `status`, `department`, `priority`) appear in the metadata response.
 
@@ -96,7 +97,9 @@ This produces `chapters: [{"title": "Background"}, {"title": "Methodology"}]`.
 
 - Create new versions by incrementing the version number in the filename
 - Keep previous versions for history (don't delete them)
-- Consider updating `status` to "Withdrawn" when superseded
+
+!!! note "Superseded documents"
+    Consider updating `status` to "Withdrawn" when a document is superseded by a newer version.
 
 ## Complete Example
 
@@ -131,5 +134,5 @@ Related documents...
 
 ## Next Steps
 
-- See [Configuration](configuration.md) to define valid values for fields like `status` and `document_type`
+- See [Configuration](configuration.md) to learn how schema discovery works
 - See [API Reference](api-reference.md) for complete tool documentation

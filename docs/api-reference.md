@@ -103,7 +103,8 @@ Retrieve the content of a specific chapter (H2 section) from a document.
 }
 ```
 
-The `chapter_title` in the response confirms which chapter was matched (useful when using case-insensitive matching).
+!!! tip "Case-insensitive matching"
+    The `chapter_title` parameter is case-insensitive. The response confirms which chapter was actually matched.
 
 ---
 
@@ -149,7 +150,7 @@ Generate a diff between two versions, grouped by chapter. Only chapters with cha
 
 **Notes:**
 
-- `"Metadata"` covers frontmatter, title, and any content before the first H2 heading
+- `"Metadata"` covers YAML metadata, title, and any content before the first H2 heading
 - Chapters with no changes are omitted from the response
 - If there are no changes, returns `{"changes": []}`
 - Chapter renames appear as two entries: the old name (with deletions) and new name (with additions)
@@ -229,7 +230,7 @@ All tools return errors in the format `{"error": {"code": "...", "message": "...
 |------|-------------|
 | `NOT_FOUND` | Document or version does not exist |
 | `CHAPTER_NOT_FOUND` | Specified chapter does not exist in the document |
-| `INVALID_FORMAT` | Document has malformed frontmatter or missing title |
+| `INVALID_FORMAT` | Document has malformed metadata or missing title |
 | `READ_ERROR` | File system error (permissions, encoding, etc.) |
 
 **Example:**
@@ -278,5 +279,5 @@ MCP clients can:
 1. List all resources to see available documents
 2. Read a resource by URI to get the full document content
 
-Resources are registered at server startup. Adding new documents requires restarting the server.
-
+!!! note
+    Resources are registered at server startup. Adding new documents requires restarting the server.
