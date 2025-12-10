@@ -225,8 +225,8 @@ class TestSchemaIntegration:
         hints = build_filter_hints(schema)
         server = create_server(documents_path, hints)
 
-        # Get the list_documents tool
-        list_docs_tool = server._tool_manager._tools.get("list_documents")
+        # Get the browse_catalog tool
+        list_docs_tool = server._tool_manager._tools.get("browse_catalog")
         assert list_docs_tool is not None
 
         # Check that the description includes our hints

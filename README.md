@@ -33,6 +33,9 @@ No RAG pipelines, no finetuning, no extra steps. From source to context window.
 - **Local First** - Your documents stay on your machine or network, no cloud dependencies
 - **Flexible Metadata** - Use any frontmatter fields your workflow needs
 - **Versioned Documents** - Store multiple versions with simple `{id}_v{version}.md` naming
+- **Chapter Extraction** - Retrieve specific sections without loading entire documents
+- **Version Diffing** - Compare changes between document versions, grouped by chapter
+- **MCP Resources** - Browse documents as native MCP resources
 
 ## One-liner to install, run and configure
 
@@ -108,8 +111,8 @@ We have tested it with [Claude Desktop](https://claude.ai/desktop) and the [GitH
 | `get_document_metadata` | `document_id`, `version?` | Get metadata including auto-parsed chapters |
 | `get_chapter_content` | `document_id`, `chapter_title`, `version?` | Retrieve content of a specific chapter (H2 section) |
 | `diff_document_versions` | `document_id`, `from_version`, `to_version` | Diff between two versions, grouped by chapter |
-| `list_documents` | `status?`, `document_type?`, `author?` | List documents with optional filters |
-| `list_document_versions` | `document_id` | List all versions of a document |
+| `browse_catalog` | `status?`, `document_type?`, `author?` | List documents with optional filters |
+| `list_revisions` | `document_id` | List all versions of a document |
 
 ## Document Schema
 
@@ -145,6 +148,16 @@ Provide the documents folder path via CLI flag or environment variable:
 |--------|-------------|
 | `--path` | Path to documents folder (CLI flag) |
 | `FOLIOS_PATH` | Path to documents folder (environment variable) |
+
+## Limitations
+
+Folios is intentionally minimal. It does **not** provide:
+
+- **Full-text search** - Use `browse_catalog` filters or let your LLM search within retrieved content
+- **Write operations** - Documents are read-only; edit them with your normal tools
+- **Authentication** - No access control; secure your documents folder via filesystem permissions
+- **Real-time updates** - Schema discovery happens at startup; restart to pick up new documents
+- **Non-Markdown formats** - Only `.md` files are supported
 
 ## Development
 

@@ -75,7 +75,7 @@ class TestPermissionErrors:
             mock_glob.side_effect = PermissionError(
                 errno.EACCES, "Permission denied on directory"
             )
-            result = server_tools.list_documents.fn()
+            result = server_tools.browse_catalog.fn()
 
         # Should return empty list gracefully, not crash
         assert result == []
@@ -108,7 +108,7 @@ class TestPermissionErrors:
             return valid_doc_content
 
         with patch.object(Path, "read_text", side_effect=flaky_read):
-            result = server_tools.list_document_versions.fn(1003)
+            result = server_tools.list_revisions.fn(1003)
 
         # Should still return at least one version or graceful error
         # Not crash
@@ -131,7 +131,7 @@ class TestDriveNotMounted:
         nonexistent = tmp_path / "nonexistent_mount"
         monkeypatch.setenv("FOLIOS_PATH", str(nonexistent))
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
         assert result == []
 
     def test_documents_path_exists_check_fails(
@@ -142,7 +142,7 @@ class TestDriveNotMounted:
             mock_exists.side_effect = OSError(
                 errno.ENETUNREACH, "Network is unreachable"
             )
-            result = server_tools.list_documents.fn()
+            result = server_tools.browse_catalog.fn()
 
         # Should handle gracefully
         assert result == []
@@ -155,7 +155,7 @@ class TestDriveNotMounted:
         unmounted_path.mkdir()
         monkeypatch.setenv("FOLIOS_PATH", str(unmounted_path))
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
         assert result == []
 
     def test_file_disappears_between_list_and_read(
@@ -243,7 +243,7 @@ class TestNetworkFailures:
         """Network goes down during directory listing."""
         with patch.object(Path, "glob") as mock_glob:
             mock_glob.side_effect = OSError(errno.ENETDOWN, "Network is down")
-            result = server_tools.list_documents.fn()
+            result = server_tools.browse_catalog.fn()
 
         assert result == []
 
@@ -410,7 +410,7 @@ class TestRaceConditions:
             return valid_doc_content
 
         with patch.object(Path, "read_text", flaky_read):
-            result = server_tools.list_documents.fn()
+            result = server_tools.browse_catalog.fn()
 
         # Should handle gracefully - empty or partial results
         assert isinstance(result, list)
@@ -422,7 +422,7 @@ class TestRaceConditions:
         create_document(4003, 1, valid_doc_content)
 
         # This should still work - listing is a point-in-time snapshot
-        result = server_tools.list_document_versions.fn(4003)
+        result = server_tools.list_revisions.fn(4003)
 
         assert "versions" in result
         assert len(result["versions"]) >= 1
@@ -450,9 +450,9 @@ class TestRaceConditions:
         create_document(4005, 2, valid_doc_content)
 
         # Interleave operations
-        list_result = server_tools.list_documents.fn()
+        list_result = server_tools.browse_catalog.fn()
         read_result = server_tools.get_document_content.fn(4005, 1)
-        versions_result = server_tools.list_document_versions.fn(4005)
+        versions_result = server_tools.list_revisions.fn(4005)
         read_result_2 = server_tools.get_document_content.fn(4005, 2)
 
         assert len(list_result) == 1
@@ -525,8 +525,8 @@ class TestGracefulDegradation:
                 result = server_tools.diff_document_versions.fn(5003, 1, 2)
                 assert "error" in result, f"Failed for {type(error).__name__}"
 
-    def test_list_documents_never_crashes(self, set_documents_env: Path, server_tools):
-        """list_documents returns empty list rather than crashing."""
+    def test_browse_catalog_never_crashes(self, set_documents_env: Path, server_tools):
+        """browse_catalog returns empty list rather than crashing."""
         error_scenarios = [
             (Path, "exists", OSError(errno.ENETDOWN, "Network down")),
             (Path, "glob", PermissionError("Cannot list")),
@@ -535,18 +535,18 @@ class TestGracefulDegradation:
 
         for cls, method, error in error_scenarios:
             with patch.object(cls, method, side_effect=error):
-                result = server_tools.list_documents.fn()
+                result = server_tools.browse_catalog.fn()
                 assert isinstance(result, list), f"Crashed for {method} with {type(error).__name__}"
 
-    def test_list_document_versions_handles_errors(
+    def test_list_revisions_handles_errors(
         self, set_documents_env: Path, create_document, valid_doc_content: str, server_tools
     ):
-        """list_document_versions returns error dict, not exception."""
+        """list_revisions returns error dict, not exception."""
         create_document(5004, 1, valid_doc_content)
 
         with patch.object(Path, "read_text") as mock_read:
             mock_read.side_effect = OSError(errno.ESTALE, "Stale handle")
-            result = server_tools.list_document_versions.fn(5004)
+            result = server_tools.list_revisions.fn(5004)
 
         # Should return error dict or empty versions, not raise
         assert isinstance(result, dict)
@@ -653,7 +653,7 @@ Content.
             encoding="utf-8"
         )
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
         assert len(result) == 1
 
 
@@ -678,7 +678,7 @@ class TestSpecialFiles:
         except OSError:
             pytest.skip("Symlinks not supported on this filesystem")
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
 
         # Should still list the valid document
         assert len(result) >= 1
@@ -695,7 +695,7 @@ class TestSpecialFiles:
         fake_doc_dir = set_documents_env / "8004_v1.md"
         fake_doc_dir.mkdir()
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
 
         # Should only list the valid file
         valid_ids = [doc.id for doc in result]
@@ -749,7 +749,7 @@ class TestRecoveryAndResilience:
             return original_read(self, *args, **kwargs)
 
         with patch.object(Path, "read_text", selective_failure):
-            result = server_tools.list_documents.fn()
+            result = server_tools.browse_catalog.fn()
 
         # Should still have the readable document
         doc_ids = [doc.id for doc in result]

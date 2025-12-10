@@ -156,7 +156,7 @@ Generate a diff between two versions, grouped by chapter. Only chapters with cha
 
 ---
 
-## list_documents
+## browse_catalog
 
 List all documents with optional filtering. Filter values are discovered automatically from your documents at startup.
 
@@ -170,7 +170,7 @@ List all documents with optional filtering. Filter values are discovered automat
 
 ```json
 {
-  "tool": "list_documents",
+  "tool": "browse_catalog",
   "parameters": {"status": "Approved"}
 }
 ```
@@ -191,7 +191,7 @@ List all documents with optional filtering. Filter values are discovered automat
 
 ---
 
-## list_document_versions
+## list_revisions
 
 List all available versions of a document.
 
@@ -203,7 +203,7 @@ List all available versions of a document.
 
 ```json
 {
-  "tool": "list_document_versions",
+  "tool": "list_revisions",
   "parameters": {"document_id": 123456}
 }
 ```
@@ -242,4 +242,41 @@ All tools return errors in the format `{"error": {"code": "...", "message": "...
   }
 }
 ```
+
+---
+
+## MCP Resources
+
+Folios also exposes documents as MCP resources, allowing clients to browse and access documents directly via URI.
+
+### Resource URI Format
+
+```
+folios://documents/{document_id}/v{version}
+```
+
+### Resource Metadata
+
+Each resource includes:
+- **name**: Document title with version (e.g., "Stress Analysis Design Practice (v2)")
+- **description**: Author, status, and document type
+- **mime_type**: `text/markdown`
+
+### Example
+
+A document `123456_v2.md` with title "Stress Analysis" becomes:
+
+```
+URI: folios://documents/123456/v2
+Name: Stress Analysis (v2)
+Description: Author: J. Smith | Status: Approved | Type: Design Practice
+```
+
+### Usage
+
+MCP clients can:
+1. List all resources to see available documents
+2. Read a resource by URI to get the full document content
+
+Resources are registered at server startup. Adding new documents requires restarting the server.
 

@@ -12,7 +12,7 @@ When Folios starts, it scans all documents in your folder and discovers the uniq
 2. **Extracts frontmatter** from each document
 3. **Collects unique values** for each field across all documents
 4. **Classifies fields** as enumerable (≤15 unique values) or free-text (>15 values)
-5. **Includes hints** in the `list_documents` tool description
+5. **Includes hints** in the `browse_catalog` tool description
 
 ### Example
 
@@ -47,7 +47,7 @@ Folios will discover:
 - **document_type**: Design Practice, Guideline, TRS (3 values - enumerable)
 - **author**: Alice, Bob (2 values - enumerable)
 
-The `list_documents` tool description will include:
+The `browse_catalog` tool description will include:
 
 ```
 Discovered filters:
@@ -104,7 +104,7 @@ Folios logs server activity to stderr, useful for debugging and monitoring perfo
                     INFO     Schema discovery: 5 fields in 234.5ms
                     INFO     Server ready
 
-                    INFO     list_documents(status=None, document_type=None, author=None)
+                    INFO     browse_catalog(status=None, document_type=None, author=None)
                     DEBUG    Returned 42 documents in 45.2ms
 ```
 

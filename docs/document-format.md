@@ -37,7 +37,7 @@ documents/
 
 ## Metadata in Tool Responses
 
-When you call `get_document_metadata` or `list_documents`, Folios returns structured metadata. Some fields are always present:
+When you call `get_document_metadata` or `browse_catalog`, Folios returns structured metadata. Some fields are always present:
 
 | Field | Source | Default |
 |-------|--------|---------|

@@ -34,7 +34,7 @@ class Chapter(BaseModel):
 
 
 class DocumentSummary(BaseModel):
-    """Summary for list_documents results."""
+    """Summary for browse_catalog results."""
 
     id: int
     title: str = "NA"
@@ -546,7 +546,7 @@ def discover_schema(docs_path: Path) -> dict[str, set[str]]:
 
 
 def build_filter_hints(schema: dict[str, set[str]]) -> str:
-    """Build description hints for the list_documents tool.
+    """Build description hints for the browse_catalog tool.
 
     Args:
         schema: Dictionary mapping field names to sets of unique values.
@@ -581,7 +581,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
 
     Args:
         docs_path: Path to the documents directory.
-        filter_hints: Dynamic description hints for list_documents.
+        filter_hints: Dynamic description hints for browse_catalog.
 
     Returns:
         Configured FastMCP server instance.
@@ -920,7 +920,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
     @server.tool(
         description="List all documents with optional filtering." + filter_hints
     )
-    def list_documents(
+    def browse_catalog(
         status: str | None = None,
         document_type: str | None = None,
         author: str | None = None,
@@ -940,7 +940,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
         Example:
             Tool call:
             ```json
-            {"tool": "list_documents", "parameters": {"status": "Approved", "document_type": "Design Practice"}}
+            {"tool": "browse_catalog", "parameters": {"status": "Approved", "document_type": "Design Practice"}}
             ```
 
             Response:
@@ -952,7 +952,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             ```
         """
         logger.info(
-            f"list_documents(status={status}, document_type={document_type}, author={author})"
+            f"browse_catalog(status={status}, document_type={document_type}, author={author})"
         )
         start = time.perf_counter()
         results = scan_documents(
@@ -963,7 +963,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
         return results
 
     @server.tool
-    def list_document_versions(document_id: int) -> dict:
+    def list_revisions(document_id: int) -> dict:
         """List all available versions of a specific document.
 
         Args:
@@ -976,7 +976,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
         Example:
             Tool call:
             ```json
-            {"tool": "list_document_versions", "parameters": {"document_id": 123456}}
+            {"tool": "list_revisions", "parameters": {"document_id": 123456}}
             ```
 
             Response:
@@ -989,7 +989,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             }
             ```
         """
-        logger.info(f"list_document_versions(document_id={document_id})")
+        logger.info(f"list_revisions(document_id={document_id})")
         start = time.perf_counter()
         versions = []
         for doc_id, doc_version, path in get_all_document_files(docs_path):

@@ -74,14 +74,14 @@ class TestMalformedDocuments:
 class TestListSkipsMalformed:
     """Tests for list operations skipping malformed documents."""
 
-    def test_list_documents_includes_partial_metadata(
+    def test_browse_catalog_includes_partial_metadata(
         self,
         set_documents_env: Path,
         create_document,
         valid_doc_content: str,
         server_tools,
     ):
-        """list_documents includes docs with partial metadata showing NA."""
+        """browse_catalog includes docs with partial metadata showing NA."""
         create_document(4001, 1, valid_doc_content)
         # Create doc with partial frontmatter (valid structure but missing fields)
         partial_content = """---
@@ -94,7 +94,7 @@ Content here.
 """
         create_document(4002, 1, partial_content)
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
 
         assert len(result) == 2
         # Check the partial doc shows NA for missing fields
@@ -102,7 +102,7 @@ Content here.
         assert partial_doc.status == "NA"
         assert partial_doc.title == "Partial Doc"
 
-    def test_list_documents_skips_unparseable(
+    def test_browse_catalog_skips_unparseable(
         self,
         set_documents_env: Path,
         create_document,
@@ -110,11 +110,11 @@ Content here.
         missing_title_content: str,
         server_tools,
     ):
-        """list_documents excludes documents that can't be parsed at all."""
+        """browse_catalog excludes documents that can't be parsed at all."""
         create_document(4003, 1, valid_doc_content)
         create_document(4004, 1, missing_title_content)
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
 
         assert len(result) == 1
         assert result[0].id == 4003
@@ -131,7 +131,7 @@ Content here.
         create_document(4003, 1, valid_doc_content)
         create_document(4003, 2, missing_title_content)
 
-        result = server_tools.list_document_versions.fn(4003)
+        result = server_tools.list_revisions.fn(4003)
 
         assert "versions" in result
         assert len(result["versions"]) == 1
@@ -149,7 +149,7 @@ Content here.
         create_document(4005, 1, valid_doc_content)
         create_document(4005, 2, malformed_frontmatter_content)
 
-        result = server_tools.list_document_versions.fn(4005)
+        result = server_tools.list_revisions.fn(4005)
 
         assert "versions" in result
         assert len(result["versions"]) == 2
@@ -161,7 +161,7 @@ Content here.
         create_document(4004, 1, missing_title_content)
         create_document(4004, 2, missing_title_content)
 
-        result = server_tools.list_document_versions.fn(4004)
+        result = server_tools.list_revisions.fn(4004)
 
         assert "error" in result
         assert result["error"]["code"] == "NOT_FOUND"
@@ -173,10 +173,10 @@ class TestPartialMetadata:
     def test_partial_frontmatter_shows_na(
         self, set_documents_env: Path, create_document, partial_frontmatter_content: str, server_tools
     ):
-        """Missing non-critical fields display 'NA' in list_documents."""
+        """Missing non-critical fields display 'NA' in browse_catalog."""
         create_document(5001, 1, partial_frontmatter_content)
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
 
         assert len(result) == 1
         doc = result[0]
@@ -201,7 +201,7 @@ Content here.
         create_document(5002, 1, partial_content)
 
         # Filter by available field works
-        result = server_tools.list_documents.fn(status="Draft")
+        result = server_tools.browse_catalog.fn(status="Draft")
         assert len(result) == 1
         assert result[0].id == 5002
 
@@ -226,7 +226,7 @@ class TestFilenameEdgeCases:
         (set_documents_env / "6001.md").write_text("Missing version")
         (set_documents_env / "v1.md").write_text("Missing id")
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
 
         assert len(result) == 1
         assert result[0].id == 6001
@@ -250,7 +250,7 @@ Content here.
 """
         create_document(6002, 999, content)
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
         assert len(result) == 1
         assert result[0].latest_version == 999
 
@@ -273,7 +273,7 @@ Content here.
 """
         create_document(999999, 1, content)
 
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
         assert len(result) == 1
         assert result[0].id == 999999
 

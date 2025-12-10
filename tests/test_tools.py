@@ -341,11 +341,11 @@ Body content version 2.
 
 
 class TestListDocuments:
-    """Tests for list_documents tool."""
+    """Tests for browse_catalog tool."""
 
     def test_returns_all_documents(self, sample_docs: Path, server_tools):
         """Returns all documents when no filters."""
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
 
         assert len(result) == 3  # 1001, 1002, 1003
         doc_ids = {doc.id for doc in result}
@@ -353,14 +353,14 @@ class TestListDocuments:
 
     def test_returns_latest_version_info(self, sample_docs: Path, server_tools):
         """Each summary shows latest version number."""
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
 
         doc_1001 = next(d for d in result if d.id == 1001)
         assert doc_1001.latest_version == 2
 
     def test_filter_by_status(self, sample_docs: Path, server_tools):
         """Status filter returns only matching documents."""
-        result = server_tools.list_documents.fn(status="Approved")
+        result = server_tools.browse_catalog.fn(status="Approved")
 
         assert len(result) == 2  # 1001 (v2) and 1003
         statuses = {doc.status for doc in result}
@@ -368,55 +368,55 @@ class TestListDocuments:
 
     def test_filter_by_type(self, sample_docs: Path, server_tools):
         """Type filter returns only matching documents."""
-        result = server_tools.list_documents.fn(document_type="Guideline")
+        result = server_tools.browse_catalog.fn(document_type="Guideline")
 
         assert len(result) == 1
         assert result[0].id == 1002
 
     def test_filter_by_author(self, sample_docs: Path, server_tools):
         """Author filter with case-insensitive substring match."""
-        result = server_tools.list_documents.fn(author="Test")
+        result = server_tools.browse_catalog.fn(author="Test")
 
         assert len(result) == 2  # 1001 and 1003 have "Test Author"
 
     def test_filter_by_author_partial_match(self, sample_docs: Path, server_tools):
         """Partial author name matches."""
-        result = server_tools.list_documents.fn(author="another")  # lowercase
+        result = server_tools.browse_catalog.fn(author="another")  # lowercase
 
         assert len(result) == 1
         assert result[0].id == 1002
 
     def test_combined_filters(self, sample_docs: Path, server_tools):
         """Multiple filters combine with AND logic."""
-        result = server_tools.list_documents.fn(status="Approved", author="Test")
+        result = server_tools.browse_catalog.fn(status="Approved", author="Test")
 
         assert len(result) == 2  # Both 1001 and 1003 are Approved with Test Author
 
     def test_no_matches_returns_empty_list(self, sample_docs: Path, server_tools):
         """Filters with no matches return empty list, not error."""
-        result = server_tools.list_documents.fn(status="Withdrawn")
+        result = server_tools.browse_catalog.fn(status="Withdrawn")
 
         assert result == []
 
     def test_invalid_status_filter_returns_empty(self, sample_docs: Path, server_tools):
         """Invalid status value returns empty list."""
-        result = server_tools.list_documents.fn(status="NonexistentStatus")
+        result = server_tools.browse_catalog.fn(status="NonexistentStatus")
 
         assert result == []
 
     def test_empty_documents_directory(self, set_documents_env: Path, server_tools):
         """Empty documents directory returns empty list."""
-        result = server_tools.list_documents.fn()
+        result = server_tools.browse_catalog.fn()
 
         assert result == []
 
 
 class TestListDocumentVersions:
-    """Tests for list_document_versions tool."""
+    """Tests for list_revisions tool."""
 
     def test_returns_all_versions_sorted(self, sample_docs: Path, server_tools):
         """Returns all versions in ascending order."""
-        result = server_tools.list_document_versions.fn(1001)
+        result = server_tools.list_revisions.fn(1001)
 
         assert "versions" in result
         assert len(result["versions"]) == 2
@@ -425,7 +425,7 @@ class TestListDocumentVersions:
 
     def test_version_info_includes_metadata(self, sample_docs: Path, server_tools):
         """Each VersionInfo has version, date, status, author."""
-        result = server_tools.list_document_versions.fn(1001)
+        result = server_tools.list_revisions.fn(1001)
 
         v1 = result["versions"][0]
         assert v1["version"] == 1
@@ -435,13 +435,13 @@ class TestListDocumentVersions:
 
     def test_single_version_document(self, sample_docs: Path, server_tools):
         """Document with single version returns list of one."""
-        result = server_tools.list_document_versions.fn(1002)
+        result = server_tools.list_revisions.fn(1002)
 
         assert len(result["versions"]) == 1
 
     def test_nonexistent_document_returns_error(self, sample_docs: Path, server_tools):
         """Non-existent document returns graceful error."""
-        result = server_tools.list_document_versions.fn(9999)
+        result = server_tools.list_revisions.fn(9999)
 
         assert "error" in result
         assert "versions" not in result
