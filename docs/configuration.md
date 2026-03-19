@@ -98,7 +98,7 @@ Folios logs server activity to stderr, useful for debugging and monitoring perfo
 ### Example Output
 
 ```
-[03/19/26 15:46:11] INFO     Folios v0.9.1 starting
+[03/19/26 15:46:11] INFO     Folios v0.10.0 starting
                     INFO     Documents path: /path/to/docs
                     INFO     Scanned 42 documents
                     INFO     Schema discovery: 5 fields in 0.6ms
@@ -151,6 +151,100 @@ In Claude Desktop configuration:
 
 !!! warning "Restart required for new documents"
     Schema discovery happens at server startup only. Adding new documents requires restarting the server to pick up changes.
+
+## Images
+
+Documents can reference images (diagrams, charts, photos) that are served as separate MCP resources. Agents can fetch individual images on demand to reason about visual content.
+
+### Folder Convention
+
+Place images in a `{id}_images/` folder alongside your document files:
+
+```
+documents/
+├── 123456_v1.md
+├── 123456_v2.md
+├── 123456_images/
+│   ├── diagram.png
+│   └── photo.jpg
+├── 789012_v1.md
+└── 789012_images/
+    └── flowchart.png
+```
+
+The image folder is shared across all versions of the same document.
+
+### Referencing Images
+
+In your markdown documents, reference images with relative paths:
+
+```markdown
+![System diagram](123456_images/diagram.png)
+```
+
+### MCP Resources
+
+Each image is registered as a binary MCP resource at:
+
+```
+folios://images/{doc_id}/{filename}
+```
+
+For example, `123456_images/diagram.png` becomes `folios://images/123456/diagram.png`.
+
+Agents can read these resources to view the actual image content.
+
+### Supported Formats
+
+| Extension | MIME Type |
+|-----------|-----------|
+| `.png` | image/png |
+| `.jpg`, `.jpeg` | image/jpeg |
+| `.gif` | image/gif |
+| `.svg` | image/svg+xml |
+| `.webp` | image/webp |
+
+!!! note
+    Image resources are registered at startup. Add images and restart the server to pick up changes.
+
+## Custom MCP Resources
+
+You can expose additional markdown files as MCP resources by placing them in a `.mcp_resources/` subfolder inside your documents directory. This is useful for workflow guides, templates, conventions, or any structured guidance that agents should have access to.
+
+### Setup
+
+```
+documents/
+├── 100001_v1.md
+├── 100002_v1.md
+└── .mcp_resources/
+    ├── how-to-propose-changes.md
+    └── review-checklist.md
+```
+
+Each `.md` file in `.mcp_resources/` is registered as an MCP resource at:
+
+```
+folios://{filename-without-extension}
+```
+
+For example, `how-to-propose-changes.md` becomes `folios://how-to-propose-changes`.
+
+### Resource naming
+
+- **Name**: extracted from the first `# H1` heading in the file, or the filename if no heading is found
+- **Description**: extracted from the first paragraph of content
+- **Content**: served as raw markdown
+
+### Use cases
+
+- **Workflow guides** — "How to propose a document change"
+- **Templates** — standard document structures for agents to follow
+- **Conventions** — naming rules, formatting standards, review criteria
+- **Instructions** — agent-specific guidance for working with your documents
+
+!!! note
+    Custom resources are registered at startup. Add or update files in `.mcp_resources/` and restart the server to pick up changes.
 
 ## Notes
 

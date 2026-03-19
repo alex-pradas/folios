@@ -6,6 +6,7 @@ and diff capabilities for engineering documents.
 
 import argparse
 import difflib
+import mimetypes
 import os
 import re
 import sys
@@ -99,6 +100,12 @@ max_document_size_bytes: int = DEFAULT_MAX_DOCUMENT_SIZE_MB * 1024 * 1024
 # Pattern for parsing document filenames: {id}_v{version}.md
 FILENAME_PATTERN = re.compile(r"^(\d+)_v(\d+)\.md$")
 
+# Pattern for image folder names: {id}_images/
+IMAGE_FOLDER_PATTERN = re.compile(r"^(\d+)_images$")
+
+# Supported image file extensions
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"}
+
 
 def _format_size_mb(size_bytes: int) -> str:
     """Format byte size as MB string."""
@@ -142,6 +149,24 @@ def _read_document(path: Path) -> str:
             f"or MAX_DOCUMENT_SIZE={int(limit_mb) + 10}"
         )
     return path.read_text(encoding="utf-8")
+
+
+def _read_binary(path: Path) -> bytes:
+    """Read a binary file with size limit enforcement.
+
+    Raises:
+        ValueError: If file exceeds max_document_size_bytes.
+    """
+    size = path.stat().st_size
+    if size > max_document_size_bytes:
+        limit_mb = max_document_size_bytes / 1024 / 1024
+        raise ValueError(
+            f"File exceeds size limit "
+            f"({_format_size_mb(size)} MB > {limit_mb:.0f} MB). "
+            f"Increase the limit with --max-file-size {int(limit_mb) + 10} "
+            f"or MAX_DOCUMENT_SIZE={int(limit_mb) + 10}"
+        )
+    return path.read_bytes()
 
 
 def _is_within_directory(path: Path, directory: Path) -> bool:
@@ -1181,6 +1206,144 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
         logger.info(msg)
 
     register_document_resources()
+
+    def register_custom_resources():
+        """Register markdown files from .mcp_resources/ as MCP resources."""
+        resources_dir = docs_path / ".mcp_resources"
+        if not resources_dir.is_dir():
+            return
+
+        count = 0
+        skipped = 0
+        for path in sorted(resources_dir.glob("*.md")):
+            try:
+                if not path.is_file():
+                    continue
+                if not _is_within_directory(path, resources_dir):
+                    continue
+                if not _check_file_size(path):
+                    skipped += 1
+                    continue
+
+                content = _read_document(path)
+                stem = path.stem
+
+                # Extract name from first H1 heading, fall back to filename
+                h1_match = TITLE_PATTERN.search(content)
+                name = h1_match.group(1).strip() if h1_match else stem
+
+                # Extract first paragraph as description
+                description = f"Custom resource: {stem}"
+                _, body = parse_frontmatter(content)
+                # Skip past the H1 line to find the first paragraph
+                for line in body.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    description = line
+                    break
+
+                def make_reader(p: Path):
+                    def read() -> str:
+                        return _read_document(p)
+                    return read
+
+                server.add_resource(
+                    FunctionResource(
+                        uri=AnyUrl(f"folios://{stem}"),
+                        name=name,
+                        description=description,
+                        mime_type="text/markdown",
+                        fn=make_reader(path),
+                    )
+                )
+                count += 1
+            except (ValueError, OSError) as e:
+                logger.warning(f"Skipping custom resource {path.name}: {e}")
+                skipped += 1
+                continue
+
+        if count or skipped:
+            msg = f"Registered {count} custom resources"
+            if skipped:
+                msg += f" ({skipped} skipped — see warnings above)"
+            logger.info(msg)
+
+    register_custom_resources()
+
+    def register_image_resources():
+        """Register images from {id}_images/ folders as MCP resources."""
+        count = 0
+        skipped = 0
+        try:
+            entries = sorted(docs_path.iterdir())
+        except OSError:
+            return
+
+        for entry in entries:
+            if not entry.is_dir():
+                continue
+            match = IMAGE_FOLDER_PATTERN.match(entry.name)
+            if not match:
+                continue
+            if not _is_within_directory(entry, docs_path):
+                continue
+
+            doc_id = match.group(1)
+
+            try:
+                image_files = sorted(entry.iterdir())
+            except OSError:
+                continue
+
+            for img_path in image_files:
+                try:
+                    if not img_path.is_file():
+                        continue
+                    if img_path.suffix.lower() not in IMAGE_EXTENSIONS:
+                        continue
+                    if not _is_within_directory(img_path, docs_path):
+                        continue
+                    if not _check_file_size(img_path):
+                        skipped += 1
+                        continue
+
+                    mime_type = (
+                        mimetypes.guess_type(img_path.name)[0]
+                        or "application/octet-stream"
+                    )
+
+                    def make_reader(p: Path):
+                        def read() -> bytes:
+                            return _read_binary(p)
+                        return read
+
+                    server.add_resource(
+                        FunctionResource(
+                            uri=AnyUrl(
+                                f"folios://images/{doc_id}/{img_path.name}"
+                            ),
+                            name=f"{img_path.name} (doc {doc_id})",
+                            description=f"Image for document {doc_id}",
+                            mime_type=mime_type,
+                            fn=make_reader(img_path),
+                        )
+                    )
+                    count += 1
+                except (ValueError, OSError) as e:
+                    logger.warning(
+                        f"Skipping image {img_path.name}: {e}"
+                    )
+                    skipped += 1
+                    continue
+
+        if count or skipped:
+            msg = f"Registered {count} image resources"
+            if skipped:
+                msg += f" ({skipped} skipped — see warnings above)"
+            logger.info(msg)
+
+    register_image_resources()
 
     return server
 
