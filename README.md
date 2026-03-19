@@ -13,6 +13,8 @@
 
 A lightweight Model Context Protocol (MCP) server for querying your local library of documents.
 
+[![Install in Cursor](https://cursor.com/deeplink/mcp-install-dark.svg)](cursor://anysphere.cursor-deeplink/mcp/install?name=folios&config=eyJjb21tYW5kIjoidXZ4IiwiYXJncyI6WyJmb2xpb3MiXX0%3D)
+
 ![Example](https://raw.githubusercontent.com/alex-pradas/folios/main/example.png)
 
 **[Documentation](https://alex-pradas.github.io/folios/)**

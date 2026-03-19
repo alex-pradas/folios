@@ -1,0 +1,17 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - path
+    properties:
+      path:
+        type: string
+        description: "Path to the folder containing versioned Markdown documents"
+  commandFunction: |-
+    (config) => ({
+      command: "uvx",
+      args: ["folios", "--path", config.path],
+      env: {}
+    })
