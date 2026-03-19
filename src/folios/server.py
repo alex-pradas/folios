@@ -55,7 +55,7 @@ class VersionInfo(BaseModel):
 class ErrorResponse(BaseModel):
     """Structured error for graceful failure responses."""
 
-    code: str  # "NOT_FOUND", "CHAPTER_NOT_FOUND", "INVALID_FORMAT", "MISSING_FIELD", "READ_ERROR"
+    code: str  # "NOT_FOUND", "CHAPTER_NOT_FOUND", "INVALID_FORMAT", "READ_ERROR"
     message: str
 
 
@@ -422,11 +422,14 @@ def parse_document(
 # =============================================================================
 
 
-def get_all_document_files(docs_path: Path) -> list[tuple[int, int, Path]]:
+def get_all_document_files(
+    docs_path: Path, warnings: list[str] | None = None
+) -> list[tuple[int, int, Path]]:
     """Scan documents directory and return all document files.
 
     Args:
         docs_path: Path to the documents directory.
+        warnings: Optional list to collect warning messages for skipped files.
 
     Returns:
         List of tuples (doc_id, version, path) for each document file.
@@ -449,6 +452,14 @@ def get_all_document_files(docs_path: Path) -> list[tuple[int, int, Path]]:
                 if not _is_within_directory(path, docs_path):
                     continue
                 if not _check_file_size(path):
+                    if warnings is not None:
+                        limit_mb = max_document_size_bytes / 1024 / 1024
+                        size = path.stat().st_size
+                        warnings.append(
+                            f"{path.name}: exceeds size limit "
+                            f"({_format_size_mb(size)} MB > {limit_mb:.0f} MB). "
+                            f"Increase with --max-file-size {int(limit_mb) + 10}"
+                        )
                     continue
                 match = FILENAME_PATTERN.match(path.name)
                 if match:
@@ -528,13 +539,13 @@ def scan_documents(
     """
     # Group files by document ID
     doc_versions: dict[int, list[tuple[int, Path]]] = {}
-    for doc_id, doc_version, path in get_all_document_files(docs_path):
+    warnings: list[str] = []
+    for doc_id, doc_version, path in get_all_document_files(docs_path, warnings):
         if doc_id not in doc_versions:
             doc_versions[doc_id] = []
         doc_versions[doc_id].append((doc_version, path))
 
     summaries = []
-    warnings = []
     for doc_id, versions in doc_versions.items():
         # Get latest version
         latest_version, latest_path = max(versions, key=lambda x: x[0])

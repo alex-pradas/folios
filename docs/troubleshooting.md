@@ -18,7 +18,7 @@ Common issues and how to resolve them.
 
 ### Documents not appearing
 
-**Symptom:** `browse_catalog` returns empty list but documents exist in the folder.
+**Symptom:** `browse_catalog` returns an empty `documents` array but files exist in the folder. Check the `warnings` field in the response for details on skipped files.
 
 **Possible causes:**
 
