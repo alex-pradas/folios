@@ -542,8 +542,12 @@ def scan_documents(
             content = _read_document(latest_path)
             frontmatter, body = parse_frontmatter(content)
             doc_title = parse_title(body)
-        except (ValueError, OSError):
-            continue  # Skip files that can't be read, parsed, or exceed size limit
+        except ValueError as e:
+            logger.warning(f"Skipping {latest_path.name}: {e}")
+            continue
+        except OSError as e:
+            logger.warning(f"Skipping {latest_path.name}: {format_os_error(e)}")
+            continue
 
         # Extract fields with "NA" defaults for missing values
         doc_status = frontmatter.get("status", "NA")
@@ -590,6 +594,7 @@ def discover_schema(docs_path: Path) -> dict[str, set[str]]:
     """
     field_values: dict[str, set[str]] = {}
     file_count = 0
+    skipped_count = 0
 
     for md_file in docs_path.glob("*.md"):
         if not FILENAME_PATTERN.match(md_file.name):
@@ -597,6 +602,7 @@ def discover_schema(docs_path: Path) -> dict[str, set[str]]:
         if not _is_within_directory(md_file, docs_path):
             continue
         if not _check_file_size(md_file):
+            skipped_count += 1
             continue
         try:
             start = time.perf_counter()
@@ -611,10 +617,19 @@ def discover_schema(docs_path: Path) -> dict[str, set[str]]:
                 if key not in field_values:
                     field_values[key] = set()
                 field_values[key].add(str(value))
-        except Exception:
+        except ValueError as e:
+            logger.warning(f"Skipping {md_file.name}: {e}")
+            skipped_count += 1
+            continue
+        except OSError as e:
+            logger.warning(f"Skipping {md_file.name}: {format_os_error(e)}")
+            skipped_count += 1
             continue
 
-    logger.info(f"Scanned {file_count} documents")
+    msg = f"Scanned {file_count} documents"
+    if skipped_count:
+        msg += f" ({skipped_count} skipped — see warnings above)"
+    logger.info(msg)
     return field_values
 
 
@@ -1079,8 +1094,12 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
                         author=metadata.get("author", "NA"),
                     )
                 )
-            except (ValueError, KeyError, OSError):
-                continue  # Skip malformed or unreadable documents
+            except (ValueError, KeyError) as e:
+                logger.warning(f"Skipping {path.name}: {e}")
+                continue
+            except OSError as e:
+                logger.warning(f"Skipping {path.name}: {format_os_error(e)}")
+                continue
 
         elapsed_ms = (time.perf_counter() - start) * 1000
         if not versions:
@@ -1101,6 +1120,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
     def register_document_resources():
         """Register each document version as a browsable resource."""
         count = 0
+        skipped = 0
         for doc_id, doc_version, path in get_all_document_files(docs_path):
             try:
                 metadata, _ = parse_document(path, doc_id, doc_version)
@@ -1126,10 +1146,19 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
                     )
                 )
                 count += 1
-            except (ValueError, OSError):
-                continue  # Skip malformed documents
+            except ValueError as e:
+                logger.warning(f"Skipping {path.name}: {e}")
+                skipped += 1
+                continue
+            except OSError as e:
+                logger.warning(f"Skipping {path.name}: {format_os_error(e)}")
+                skipped += 1
+                continue
 
-        logger.info(f"Registered {count} document resources")
+        msg = f"Registered {count} document resources"
+        if skipped:
+            msg += f" ({skipped} skipped — see warnings above)"
+        logger.info(msg)
 
     register_document_resources()
 
