@@ -7,23 +7,6 @@ Folios is a Python package available on [PyPI](https://pypi.org/project/folios/)
 - Python 3.10 or later
 - A folder of Markdown documents following the `{id}_v{version}.md` naming convention
 
-## Quick start
-
-In most cases, you don't need to install Folios manually — your MCP client launches it as a subprocess. Skip to [MCP client configuration](#mcp-client-configuration) for setup instructions.
-
-To test Folios standalone (e.g., to verify your documents parse correctly):
-
-```bash
-uvx folios --path /path/to/your/documents
-```
-
-This downloads and runs Folios in one command using [uv](https://docs.astral.sh/uv/). You can also install with pip:
-
-```bash
-pip install folios
-folios --path /path/to/your/documents
-```
-
 ## Documents path
 
 Folios needs to know where your documents live. You can provide this via:
@@ -212,3 +195,13 @@ Once configured, your AI assistant should have access to six tools:
 | `list_revisions` | List all versions of a document |
 
 Try asking your AI assistant: *"What documents are available?"* — it should call `browse_catalog` and return your document list.
+
+## Debugging
+
+You don't need to run Folios manually — your MCP client handles that. But if you want to verify your documents parse correctly, you can run it standalone:
+
+```bash
+uvx folios --path /path/to/your/documents
+```
+
+This downloads and runs Folios in one command using [uv](https://docs.astral.sh/uv/). The server will start, scan your documents, and log what it finds. Press `Ctrl+C` to stop.
