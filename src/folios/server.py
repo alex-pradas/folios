@@ -89,8 +89,71 @@ def format_os_error(error: OSError) -> str:
     return " ".join(parts) if parts else "Unknown I/O error"
 
 
+# Default maximum file size for documents (in MB). Configurable via
+# --max-file-size CLI flag or MAX_DOCUMENT_SIZE environment variable.
+DEFAULT_MAX_DOCUMENT_SIZE_MB = 10
+
+# Resolved at startup in main(); used by _read_document() and _check_file_size().
+max_document_size_bytes: int = DEFAULT_MAX_DOCUMENT_SIZE_MB * 1024 * 1024
+
 # Pattern for parsing document filenames: {id}_v{version}.md
 FILENAME_PATTERN = re.compile(r"^(\d+)_v(\d+)\.md$")
+
+
+def _format_size_mb(size_bytes: int) -> str:
+    """Format byte size as MB string."""
+    return f"{size_bytes / 1024 / 1024:.1f}"
+
+
+def _check_file_size(path: Path) -> bool:
+    """Check if file is within size limit. Log warning if not.
+
+    Returns True if file is within limits, False if it exceeds them.
+    Used by scanning functions to skip oversized files with a warning.
+    """
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return True  # Let the caller handle read errors
+    if size > max_document_size_bytes:
+        limit_mb = max_document_size_bytes / 1024 / 1024
+        logger.warning(
+            f"Skipping {path.name}: exceeds size limit "
+            f"({_format_size_mb(size)} MB > {limit_mb:.0f} MB). "
+            f"Increase with --max-file-size {int(limit_mb) + 10}"
+        )
+        return False
+    return True
+
+
+def _read_document(path: Path) -> str:
+    """Read a document file with size limit enforcement.
+
+    Raises:
+        ValueError: If file exceeds max_document_size_bytes.
+    """
+    size = path.stat().st_size
+    if size > max_document_size_bytes:
+        limit_mb = max_document_size_bytes / 1024 / 1024
+        raise ValueError(
+            f"File exceeds size limit "
+            f"({_format_size_mb(size)} MB > {limit_mb:.0f} MB). "
+            f"Increase the limit with --max-file-size {int(limit_mb) + 10} "
+            f"or MAX_DOCUMENT_SIZE={int(limit_mb) + 10}"
+        )
+    return path.read_text(encoding="utf-8")
+
+
+def _is_within_directory(path: Path, directory: Path) -> bool:
+    """Check that a resolved path is within the expected directory.
+
+    Prevents symlink traversal by resolving both paths and comparing.
+    """
+    try:
+        path.resolve().relative_to(directory.resolve())
+        return True
+    except ValueError:
+        return False
 
 # Pattern for extracting title (first H1 heading)
 TITLE_PATTERN = re.compile(r"^#\s+(.+)$", re.MULTILINE)
@@ -331,7 +394,7 @@ def parse_document(
     if not path.exists():
         raise FileNotFoundError(f"Document not found: {path}")
 
-    content = path.read_text(encoding="utf-8")
+    content = _read_document(path)
     frontmatter, body = parse_frontmatter(content)
     title = parse_title(body)
     chapters = parse_chapters(body)
@@ -380,8 +443,12 @@ def get_all_document_files(docs_path: Path) -> list[tuple[int, int, Path]]:
     try:
         for path in docs_path.glob("*.md"):
             try:
-                # Verify the path is a file (not a directory with .md extension)
+                # Verify the path is a file and stays within docs folder
                 if not path.is_file():
+                    continue
+                if not _is_within_directory(path, docs_path):
+                    continue
+                if not _check_file_size(path):
                     continue
                 match = FILENAME_PATTERN.match(path.name)
                 if match:
@@ -436,6 +503,8 @@ def find_document_path(
     path = docs_path / f"{doc_id}_v{version}.md"
     if not path.exists():
         raise FileNotFoundError(f"Document {doc_id} version {version} not found")
+    if not _is_within_directory(path, docs_path):
+        raise FileNotFoundError(f"Document {doc_id} version {version} not found")
 
     return path, version
 
@@ -470,11 +539,11 @@ def scan_documents(
         latest_version, latest_path = max(versions, key=lambda x: x[0])
 
         try:
-            content = latest_path.read_text(encoding="utf-8")
+            content = _read_document(latest_path)
             frontmatter, body = parse_frontmatter(content)
             doc_title = parse_title(body)
         except (ValueError, OSError):
-            continue  # Skip files that can't be read or parsed
+            continue  # Skip files that can't be read, parsed, or exceed size limit
 
         # Extract fields with "NA" defaults for missing values
         doc_status = frontmatter.get("status", "NA")
@@ -525,9 +594,13 @@ def discover_schema(docs_path: Path) -> dict[str, set[str]]:
     for md_file in docs_path.glob("*.md"):
         if not FILENAME_PATTERN.match(md_file.name):
             continue
+        if not _is_within_directory(md_file, docs_path):
+            continue
+        if not _check_file_size(md_file):
+            continue
         try:
             start = time.perf_counter()
-            content = md_file.read_text(encoding="utf-8")
+            content = _read_document(md_file)
             frontmatter, _ = parse_frontmatter(content)
             elapsed_ms = (time.perf_counter() - start) * 1000
             logger.debug(
@@ -623,7 +696,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
         start = time.perf_counter()
         try:
             path, _ = find_document_path(docs_path, document_id, version)
-            content = path.read_text(encoding="utf-8")
+            content = _read_document(path)
             elapsed_ms = (time.perf_counter() - start) * 1000
             logger.debug(f"Returned {len(content)}B in {elapsed_ms:.1f}ms")
             return {"content": content}
@@ -752,7 +825,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
         start = time.perf_counter()
         try:
             path, _ = find_document_path(docs_path, document_id, version)
-            content = path.read_text(encoding="utf-8")
+            content = _read_document(path)
             _, body = parse_frontmatter(content)
 
             result = extract_chapter_content(body, chapter_title)
@@ -844,8 +917,8 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             old_path, _ = find_document_path(docs_path, document_id, from_version)
             new_path, _ = find_document_path(docs_path, document_id, to_version)
 
-            old_content = old_path.read_text(encoding="utf-8")
-            new_content = new_path.read_text(encoding="utf-8")
+            old_content = _read_document(old_path)
+            new_content = _read_document(new_path)
 
             # Get chapter boundaries for both versions
             old_boundaries = get_chapter_boundaries(old_content)
@@ -1039,7 +1112,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
                 # Capture path in closure for lazy reading
                 def make_reader(p: Path):
                     def read() -> str:
-                        return p.read_text(encoding="utf-8")
+                        return _read_document(p)
 
                     return read
 
@@ -1070,11 +1143,20 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
 
 def main():
     """Run the Folios MCP server."""
+    global max_document_size_bytes
+
     parser = argparse.ArgumentParser(description="Folios MCP Server")
     parser.add_argument(
         "--path",
         type=Path,
         help="Path to the folder containing versioned documents",
+    )
+    parser.add_argument(
+        "--max-file-size",
+        type=int,
+        default=None,
+        metavar="MB",
+        help=f"Maximum document file size in MB (default: {DEFAULT_MAX_DOCUMENT_SIZE_MB})",
     )
     args = parser.parse_args()
 
@@ -1094,6 +1176,22 @@ def main():
             file=sys.stderr,
         )
         sys.exit(1)
+
+    # Resolve max file size: CLI flag > env var > default
+    max_size_mb = args.max_file_size
+    if max_size_mb is None:
+        env_size = os.environ.get("MAX_DOCUMENT_SIZE")
+        if env_size:
+            try:
+                max_size_mb = int(env_size)
+            except ValueError:
+                print(
+                    f"Error: Invalid MAX_DOCUMENT_SIZE value: {env_size!r} (expected integer in MB)",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+    if max_size_mb is not None:
+        max_document_size_bytes = max_size_mb * 1024 * 1024
 
     logger.info(f"Folios v{__version__} starting")
     logger.info(f"Documents path: {docs_path}")

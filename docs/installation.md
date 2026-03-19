@@ -18,6 +18,14 @@ Folios needs to know where your documents live. You can provide this via:
 
 The environment variable is useful when configuring Folios as an MCP server in a client, so you don't need to hardcode the path in each config file.
 
+## Optional settings
+
+The only required setting is the documents path. You can optionally tune these:
+
+| Setting | CLI flag | Environment variable | Default | Description |
+|---------|----------|---------------------|---------|-------------|
+| Max file size | `--max-file-size 20` | `MAX_DOCUMENT_SIZE=20` | 10 MB | Maximum document size in MB. Files exceeding this limit are skipped during catalog browsing (with a warning) and return an error when read directly. Increase if your documents are larger than 10 MB. |
+
 ## MCP client configuration
 
 Folios is a stdio-based MCP server — your AI client launches it automatically as a subprocess. You don't need to run it separately. Just add the configuration below to your client's MCP settings.
