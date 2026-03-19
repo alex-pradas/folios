@@ -25,6 +25,9 @@ wheels/
 venv/
 ENV/
 
+# macOS
+.DS_Store
+
 # IDE
 .idea/
 .vscode/
