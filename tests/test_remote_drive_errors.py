@@ -75,10 +75,10 @@ class TestPermissionErrors:
             mock_glob.side_effect = PermissionError(
                 errno.EACCES, "Permission denied on directory"
             )
-            result = server_tools.browse_catalog.fn()
+            response = server_tools.browse_catalog.fn()
 
         # Should return empty list gracefully, not crash
-        assert result == []
+        assert response["documents"] == []
 
     def test_no_execute_permission_on_directory(
         self, set_documents_env: Path, documents_path: Path
@@ -131,8 +131,8 @@ class TestDriveNotMounted:
         nonexistent = tmp_path / "nonexistent_mount"
         monkeypatch.setenv("FOLIOS_PATH", str(nonexistent))
 
-        result = server_tools.browse_catalog.fn()
-        assert result == []
+        response = server_tools.browse_catalog.fn()
+        assert response["documents"] == []
 
     def test_documents_path_exists_check_fails(
         self, set_documents_env: Path, server_tools
@@ -142,10 +142,10 @@ class TestDriveNotMounted:
             mock_exists.side_effect = OSError(
                 errno.ENETUNREACH, "Network is unreachable"
             )
-            result = server_tools.browse_catalog.fn()
+            response = server_tools.browse_catalog.fn()
 
         # Should handle gracefully
-        assert result == []
+        assert response["documents"] == []
 
     def test_glob_returns_empty_on_unmounted_drive(
         self, tmp_path: Path, monkeypatch, server_tools
@@ -155,8 +155,8 @@ class TestDriveNotMounted:
         unmounted_path.mkdir()
         monkeypatch.setenv("FOLIOS_PATH", str(unmounted_path))
 
-        result = server_tools.browse_catalog.fn()
-        assert result == []
+        response = server_tools.browse_catalog.fn()
+        assert response["documents"] == []
 
     def test_file_disappears_between_list_and_read(
         self, set_documents_env: Path, create_document, valid_doc_content: str, server_tools
@@ -243,9 +243,9 @@ class TestNetworkFailures:
         """Network goes down during directory listing."""
         with patch.object(Path, "glob") as mock_glob:
             mock_glob.side_effect = OSError(errno.ENETDOWN, "Network is down")
-            result = server_tools.browse_catalog.fn()
+            response = server_tools.browse_catalog.fn()
 
-        assert result == []
+        assert response["documents"] == []
 
     def test_connection_reset_during_read(
         self, set_documents_env: Path, create_document, valid_doc_content: str, server_tools
@@ -410,10 +410,10 @@ class TestRaceConditions:
             return valid_doc_content
 
         with patch.object(Path, "read_text", flaky_read):
-            result = server_tools.browse_catalog.fn()
+            response = server_tools.browse_catalog.fn()
 
         # Should handle gracefully - empty or partial results
-        assert isinstance(result, list)
+        assert isinstance(response, dict)
 
     def test_version_appears_mid_list(
         self, set_documents_env: Path, create_document, valid_doc_content: str, server_tools
@@ -450,12 +450,12 @@ class TestRaceConditions:
         create_document(4005, 2, valid_doc_content)
 
         # Interleave operations
-        list_result = server_tools.browse_catalog.fn()
+        list_response = server_tools.browse_catalog.fn()
         read_result = server_tools.get_document_content.fn(4005, 1)
         versions_result = server_tools.list_revisions.fn(4005)
         read_result_2 = server_tools.get_document_content.fn(4005, 2)
 
-        assert len(list_result) == 1
+        assert len(list_response["documents"]) == 1
         assert "content" in read_result
         assert "versions" in versions_result
         assert "content" in read_result_2
@@ -535,8 +535,8 @@ class TestGracefulDegradation:
 
         for cls, method, error in error_scenarios:
             with patch.object(cls, method, side_effect=error):
-                result = server_tools.browse_catalog.fn()
-                assert isinstance(result, list), f"Crashed for {method} with {type(error).__name__}"
+                response = server_tools.browse_catalog.fn()
+                assert isinstance(response, dict), f"Crashed for {method} with {type(error).__name__}"
 
     def test_list_revisions_handles_errors(
         self, set_documents_env: Path, create_document, valid_doc_content: str, server_tools
@@ -653,8 +653,8 @@ Content.
             encoding="utf-8"
         )
 
-        result = server_tools.browse_catalog.fn()
-        assert len(result) == 1
+        response = server_tools.browse_catalog.fn()
+        assert len(response["documents"]) == 1
 
 
 # =============================================================================
@@ -678,11 +678,12 @@ class TestSpecialFiles:
         except OSError:
             pytest.skip("Symlinks not supported on this filesystem")
 
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
 
         # Should still list the valid document
         assert len(result) >= 1
-        valid_ids = [doc.id for doc in result]
+        valid_ids = [doc["id"] for doc in result]
         assert 8001 in valid_ids
 
     def test_directory_with_md_extension_is_skipped(
@@ -695,10 +696,11 @@ class TestSpecialFiles:
         fake_doc_dir = set_documents_env / "8004_v1.md"
         fake_doc_dir.mkdir()
 
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
 
         # Should only list the valid file
-        valid_ids = [doc.id for doc in result]
+        valid_ids = [doc["id"] for doc in result]
         assert 8003 in valid_ids
         assert 8004 not in valid_ids
 
@@ -749,10 +751,11 @@ class TestRecoveryAndResilience:
             return original_read(self, *args, **kwargs)
 
         with patch.object(Path, "read_text", selective_failure):
-            result = server_tools.browse_catalog.fn()
+            response = server_tools.browse_catalog.fn()
 
         # Should still have the readable document
-        doc_ids = [doc.id for doc in result]
+        result = response["documents"]
+        doc_ids = [doc["id"] for doc in result]
         assert 9003 in doc_ids
 
     def test_independent_operations_dont_affect_each_other(

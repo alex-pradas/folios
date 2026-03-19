@@ -345,70 +345,77 @@ class TestListDocuments:
 
     def test_returns_all_documents(self, sample_docs: Path, server_tools):
         """Returns all documents when no filters."""
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
 
         assert len(result) == 3  # 1001, 1002, 1003
-        doc_ids = {doc.id for doc in result}
+        doc_ids = {doc["id"] for doc in result}
         assert doc_ids == {1001, 1002, 1003}
 
     def test_returns_latest_version_info(self, sample_docs: Path, server_tools):
         """Each summary shows latest version number."""
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
 
-        doc_1001 = next(d for d in result if d.id == 1001)
-        assert doc_1001.latest_version == 2
+        doc_1001 = next(d for d in result if d["id"] == 1001)
+        assert doc_1001["latest_version"] == 2
 
     def test_filter_by_status(self, sample_docs: Path, server_tools):
         """Status filter returns only matching documents."""
-        result = server_tools.browse_catalog.fn(status="Approved")
+        response = server_tools.browse_catalog.fn(status="Approved")
+        result = response["documents"]
 
         assert len(result) == 2  # 1001 (v2) and 1003
-        statuses = {doc.status for doc in result}
+        statuses = {doc["status"] for doc in result}
         assert statuses == {"Approved"}
 
     def test_filter_by_type(self, sample_docs: Path, server_tools):
         """Type filter returns only matching documents."""
-        result = server_tools.browse_catalog.fn(document_type="Guideline")
+        response = server_tools.browse_catalog.fn(document_type="Guideline")
+        result = response["documents"]
 
         assert len(result) == 1
-        assert result[0].id == 1002
+        assert result[0]["id"] == 1002
 
     def test_filter_by_author(self, sample_docs: Path, server_tools):
         """Author filter with case-insensitive substring match."""
-        result = server_tools.browse_catalog.fn(author="Test")
+        response = server_tools.browse_catalog.fn(author="Test")
+        result = response["documents"]
 
         assert len(result) == 2  # 1001 and 1003 have "Test Author"
 
     def test_filter_by_author_partial_match(self, sample_docs: Path, server_tools):
         """Partial author name matches."""
-        result = server_tools.browse_catalog.fn(author="another")  # lowercase
+        response = server_tools.browse_catalog.fn(author="another")  # lowercase
+        result = response["documents"]
 
         assert len(result) == 1
-        assert result[0].id == 1002
+        assert result[0]["id"] == 1002
 
     def test_combined_filters(self, sample_docs: Path, server_tools):
         """Multiple filters combine with AND logic."""
-        result = server_tools.browse_catalog.fn(status="Approved", author="Test")
+        response = server_tools.browse_catalog.fn(status="Approved", author="Test")
+        result = response["documents"]
 
         assert len(result) == 2  # Both 1001 and 1003 are Approved with Test Author
 
     def test_no_matches_returns_empty_list(self, sample_docs: Path, server_tools):
         """Filters with no matches return empty list, not error."""
-        result = server_tools.browse_catalog.fn(status="Withdrawn")
+        response = server_tools.browse_catalog.fn(status="Withdrawn")
 
-        assert result == []
+        assert response["documents"] == []
 
     def test_invalid_status_filter_returns_empty(self, sample_docs: Path, server_tools):
         """Invalid status value returns empty list."""
-        result = server_tools.browse_catalog.fn(status="NonexistentStatus")
+        response = server_tools.browse_catalog.fn(status="NonexistentStatus")
 
-        assert result == []
+        assert response["documents"] == []
 
     def test_empty_documents_directory(self, set_documents_env: Path, server_tools):
         """Empty documents directory returns empty list."""
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
 
-        assert result == []
+        assert response["documents"] == []
 
 
 class TestListDocumentVersions:

@@ -190,30 +190,35 @@ List all documents with optional filtering. Filter values are discovered automat
 **Response:**
 
 ```json
-[
-  {
-    "id": 123456,
-    "title": "Introduction",
-    "latest_version": 2,
-    "status": "Approved",
-    "document_type": "Design Practice"
-  },
-  {
-    "id": 200001,
-    "title": "Steel Material Properties Handbook",
-    "latest_version": 1,
-    "status": "Approved",
-    "document_type": "Material Specification"
-  },
-  {
-    "id": 200002,
-    "title": "Component Acceptance Testing Procedure",
-    "latest_version": 1,
-    "status": "Approved",
-    "document_type": "Procedure"
-  }
-]
+{
+  "documents": [
+    {
+      "id": 123456,
+      "title": "Introduction",
+      "latest_version": 2,
+      "status": "Approved",
+      "document_type": "Design Practice"
+    },
+    {
+      "id": 200001,
+      "title": "Steel Material Properties Handbook",
+      "latest_version": 1,
+      "status": "Approved",
+      "document_type": "Material Specification"
+    },
+    {
+      "id": 200002,
+      "title": "Component Acceptance Testing Procedure",
+      "latest_version": 1,
+      "status": "Approved",
+      "document_type": "Procedure"
+    }
+  ]
+}
 ```
+
+!!! note "Warnings for skipped documents"
+    If any documents in the folder could not be parsed, the response includes a `"warnings"` field listing each skipped file and the reason (missing title, malformed frontmatter, file too large, permission error, etc.).
 
 **Filter by document type:**
 

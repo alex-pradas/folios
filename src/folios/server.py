@@ -514,8 +514,8 @@ def scan_documents(
     status: str | None = None,
     doc_type: str | None = None,
     author: str | None = None,
-) -> list[DocumentSummary]:
-    """Scan and filter documents, returning summaries.
+) -> tuple[list[DocumentSummary], list[str]]:
+    """Scan and filter documents, returning summaries and warnings.
 
     Args:
         docs_path: Path to the documents directory.
@@ -524,7 +524,7 @@ def scan_documents(
         author: Filter by author name (case-insensitive substring match).
 
     Returns:
-        List of DocumentSummary for matching documents.
+        Tuple of (list of DocumentSummary, list of warning strings).
     """
     # Group files by document ID
     doc_versions: dict[int, list[tuple[int, Path]]] = {}
@@ -534,6 +534,7 @@ def scan_documents(
         doc_versions[doc_id].append((doc_version, path))
 
     summaries = []
+    warnings = []
     for doc_id, versions in doc_versions.items():
         # Get latest version
         latest_version, latest_path = max(versions, key=lambda x: x[0])
@@ -543,10 +544,14 @@ def scan_documents(
             frontmatter, body = parse_frontmatter(content)
             doc_title = parse_title(body)
         except ValueError as e:
-            logger.warning(f"Skipping {latest_path.name}: {e}")
+            msg = f"{latest_path.name}: {e}"
+            logger.warning(f"Skipping {msg}")
+            warnings.append(msg)
             continue
         except OSError as e:
-            logger.warning(f"Skipping {latest_path.name}: {format_os_error(e)}")
+            msg = f"{latest_path.name}: {format_os_error(e)}"
+            logger.warning(f"Skipping {msg}")
+            warnings.append(msg)
             continue
 
         # Extract fields with "NA" defaults for missing values
@@ -572,7 +577,7 @@ def scan_documents(
             )
         )
 
-    return summaries
+    return summaries, warnings
 
 
 # =============================================================================
@@ -1012,7 +1017,7 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
         status: str | None = None,
         document_type: str | None = None,
         author: str | None = None,
-    ) -> list[DocumentSummary]:
+    ) -> dict:
         """List all documents with optional filtering.
 
         Args:
@@ -1021,9 +1026,8 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
             author: Filter by author name (case-insensitive substring match).
 
         Returns:
-            List of documents with {id, title, latest_version, status, document_type} for each.
-            Returns empty list if no documents match the filters.
-            Fields show "NA" if not present in document frontmatter.
+            On success: {"documents": [{id, title, latest_version, status, document_type}, ...]}
+            If some documents had issues: includes "warnings" with details of skipped files.
 
         Example:
             Tool call:
@@ -1033,22 +1037,27 @@ def create_server(docs_path: Path, filter_hints: str) -> FastMCP:
 
             Response:
             ```json
-            [
-              {"id": 123456, "title": "Stress Analysis", "latest_version": 2, "status": "Approved", "document_type": "Design Practice"},
-              {"id": 789012, "title": "Fatigue Analysis", "latest_version": 1, "status": "Approved", "document_type": "Design Practice"}
-            ]
+            {
+              "documents": [
+                {"id": 123456, "title": "Stress Analysis", "latest_version": 2, "status": "Approved", "document_type": "Design Practice"},
+                {"id": 789012, "title": "Fatigue Analysis", "latest_version": 1, "status": "Approved", "document_type": "Design Practice"}
+              ]
+            }
             ```
         """
         logger.info(
             f"browse_catalog(status={status}, document_type={document_type}, author={author})"
         )
         start = time.perf_counter()
-        results = scan_documents(
+        results, warnings = scan_documents(
             docs_path, status=status, doc_type=document_type, author=author
         )
         elapsed_ms = (time.perf_counter() - start) * 1000
         logger.debug(f"Returned {len(results)} documents in {elapsed_ms:.1f}ms")
-        return results
+        response: dict = {"documents": [r.model_dump() for r in results]}
+        if warnings:
+            response["warnings"] = warnings
+        return response
 
     @server.tool
     def list_revisions(document_id: int) -> dict:

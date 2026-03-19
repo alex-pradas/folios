@@ -94,13 +94,14 @@ Content here.
 """
         create_document(4002, 1, partial_content)
 
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
 
         assert len(result) == 2
         # Check the partial doc shows NA for missing fields
-        partial_doc = next(d for d in result if d.id == 4002)
-        assert partial_doc.status == "NA"
-        assert partial_doc.title == "Partial Doc"
+        partial_doc = next(d for d in result if d["id"] == 4002)
+        assert partial_doc["status"] == "NA"
+        assert partial_doc["title"] == "Partial Doc"
 
     def test_browse_catalog_skips_unparseable(
         self,
@@ -114,10 +115,11 @@ Content here.
         create_document(4003, 1, valid_doc_content)
         create_document(4004, 1, missing_title_content)
 
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
 
         assert len(result) == 1
-        assert result[0].id == 4003
+        assert result[0]["id"] == 4003
 
     def test_list_versions_skips_unparseable_versions(
         self,
@@ -176,15 +178,16 @@ class TestPartialMetadata:
         """Missing non-critical fields display 'NA' in browse_catalog."""
         create_document(5001, 1, partial_frontmatter_content)
 
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
 
         assert len(result) == 1
         doc = result[0]
-        assert doc.id == 5001
-        assert doc.title == "Partial Document"
-        assert doc.status == "NA"
+        assert doc["id"] == 5001
+        assert doc["title"] == "Partial Document"
+        assert doc["status"] == "NA"
         # document_type is "Guideline" in partial_frontmatter_content fixture
-        assert doc.document_type == "Guideline"
+        assert doc["document_type"] == "Guideline"
 
     def test_partial_metadata_still_filterable(
         self, set_documents_env: Path, create_document, valid_doc_content: str, server_tools
@@ -201,12 +204,13 @@ Content here.
         create_document(5002, 1, partial_content)
 
         # Filter by available field works
-        result = server_tools.browse_catalog.fn(status="Draft")
+        response = server_tools.browse_catalog.fn(status="Draft")
+        result = response["documents"]
         assert len(result) == 1
-        assert result[0].id == 5002
+        assert result[0]["id"] == 5002
 
         # document_type shows NA since not provided
-        assert result[0].document_type == "NA"
+        assert result[0]["document_type"] == "NA"
 
 
 class TestFilenameEdgeCases:
@@ -226,10 +230,11 @@ class TestFilenameEdgeCases:
         (set_documents_env / "6001.md").write_text("Missing version")
         (set_documents_env / "v1.md").write_text("Missing id")
 
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
 
         assert len(result) == 1
-        assert result[0].id == 6001
+        assert result[0]["id"] == 6001
 
     def test_handles_large_version_numbers(
         self, set_documents_env: Path, create_document, server_tools
@@ -250,9 +255,10 @@ Content here.
 """
         create_document(6002, 999, content)
 
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
         assert len(result) == 1
-        assert result[0].latest_version == 999
+        assert result[0]["latest_version"] == 999
 
     def test_handles_large_document_ids(
         self, set_documents_env: Path, create_document, server_tools
@@ -273,9 +279,10 @@ Content here.
 """
         create_document(999999, 1, content)
 
-        result = server_tools.browse_catalog.fn()
+        response = server_tools.browse_catalog.fn()
+        result = response["documents"]
         assert len(result) == 1
-        assert result[0].id == 999999
+        assert result[0]["id"] == 999999
 
 
 class TestDiffEdgeCases:
