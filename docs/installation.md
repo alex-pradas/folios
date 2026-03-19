@@ -4,8 +4,7 @@ Folios is a Python package available on [PyPI](https://pypi.org/project/folios/)
 
 ## Prerequisites
 
-- Python 3.10 or later
-- A folder of Markdown documents following the `{id}_v{version}.md` naming convention
+- [uv](https://docs.astral.sh/uv/getting-started/installation/) — the MCP config uses `uvx` to run Folios, which handles Python automatically
 
 ## Documents path
 
