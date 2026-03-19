@@ -1,0 +1,12 @@
+{
+  "name": "folios",
+  "description": "MCP server for querying a local library of versioned Markdown documents",
+  "version": "0.8.0",
+  "author": {
+    "name": "Alex Pradas"
+  },
+  "homepage": "https://alex-pradas.github.io/folios/",
+  "repository": "https://github.com/alex-pradas/folios",
+  "license": "MIT",
+  "keywords": ["mcp", "documents", "markdown", "versioning"]
+}

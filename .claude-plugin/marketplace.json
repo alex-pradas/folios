@@ -1,0 +1,21 @@
+{
+  "name": "alex-pradas-folios",
+  "owner": {
+    "name": "Alex Pradas"
+  },
+  "metadata": {
+    "description": "Folios - local document library MCP server for Claude Code"
+  },
+  "plugins": [
+    {
+      "name": "folios",
+      "source": "./plugin",
+      "description": "MCP server for querying a local library of versioned Markdown documents. Point to a folder of Markdown files and give AI agents read-only access to versioned documents, metadata, and diffs.",
+      "homepage": "https://alex-pradas.github.io/folios/",
+      "repository": "https://github.com/alex-pradas/folios",
+      "license": "MIT",
+      "keywords": ["mcp", "documents", "markdown", "versioning"],
+      "category": "development-workflows"
+    }
+  ]
+}
