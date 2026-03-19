@@ -9,15 +9,15 @@ Folios is a Python package available on [PyPI](https://pypi.org/project/folios/)
 
 ## Quick start
 
-The fastest way to run Folios:
+In most cases, you don't need to install Folios manually — your MCP client launches it as a subprocess. Skip to [MCP client configuration](#mcp-client-configuration) for setup instructions.
+
+To test Folios standalone (e.g., to verify your documents parse correctly):
 
 ```bash
 uvx folios --path /path/to/your/documents
 ```
 
-This downloads and runs Folios in one command using [uv](https://docs.astral.sh/uv/). No installation step needed.
-
-Alternatively, install with pip:
+This downloads and runs Folios in one command using [uv](https://docs.astral.sh/uv/). You can also install with pip:
 
 ```bash
 pip install folios
@@ -36,6 +36,8 @@ Folios needs to know where your documents live. You can provide this via:
 The environment variable is useful when configuring Folios as an MCP server in a client, so you don't need to hardcode the path in each config file.
 
 ## MCP client configuration
+
+Folios is a stdio-based MCP server — your AI client launches it automatically as a subprocess. You don't need to run it separately. Just add the configuration below to your client's MCP settings.
 
 ### Generic MCP configuration
 
