@@ -16,9 +16,6 @@ Common issues and how to resolve them.
    ```
    **Solution:** Check the path exists and is accessible.
 
-2. **Port already in use** - Another process is using the MCP socket
-   **Solution:** Check for other Folios instances or MCP servers running.
-
 ### Documents not appearing
 
 **Symptom:** `browse_catalog` returns empty list but documents exist in the folder.
@@ -188,10 +185,7 @@ Schema discovery is very fast (~70K docs/sec), so this is unlikely unless you ha
 
 **Symptom:** Server uses excessive memory.
 
-Folios loads document content on-demand, not at startup. High memory usage suggests either:
-
-- Very large documents being read repeatedly
-- Many concurrent requests
+Folios loads document content on-demand, not at startup. Documents exceeding the size limit (default 10 MB) are automatically skipped. If you've increased `--max-file-size`, large documents may consume significant memory when read.
 
 ## Getting Help
 
