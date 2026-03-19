@@ -54,6 +54,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Installation: installation.md
   - Document Format: document-format.md
   - Configuration: configuration.md
   - API Reference: api-reference.md
