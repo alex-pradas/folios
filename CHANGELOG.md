@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-03-19
+
+### Changed
+
+- **BREAKING**: `browse_catalog` now returns `{"documents": [...], "warnings": [...]}` instead of a plain list. The `warnings` key is only present when documents were skipped.
+
+### Added
+
+- Warnings surfaced in `browse_catalog` response when documents are skipped (missing title, malformed frontmatter, file too large, permission errors)
+- Log warnings with specific reasons for each skipped document during scanning and resource registration
+
+### Fixed
+
+- Removed incorrect "port already in use" troubleshooting entry (Folios is stdio-based)
+
 ## [0.8.1] - 2026-03-19
 
 ### Fixed
